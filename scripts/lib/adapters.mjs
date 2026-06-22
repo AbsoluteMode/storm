@@ -8,8 +8,6 @@
 //   claude  : `claude -p`           — no prompt arg; -p with no argument reads stdin
 //   codex   : `codex exec`          — no prompt arg; reads stdin when arg omitted
 //   agy     : `agy --model M -p ...`— no prompt arg; -p with no argument reads stdin
-//
-// WHY: docs/decisions/ (ARG_MAX fix, v1.1)
 
 const ADAPTERS = {
   claude: {

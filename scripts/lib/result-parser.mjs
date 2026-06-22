@@ -19,6 +19,7 @@ export function extractResult(raw) {
   }
 
   // Find the last OPEN that starts strictly before closeIdx.
+  // When closeIdx === 0, closeIdx - 1 === -1, so lastIndexOf returns -1 safely (no_marker).
   const openIdx = raw.lastIndexOf(OPEN, closeIdx - 1);
   if (openIdx === -1) {
     // A CLOSE exists but no OPEN precedes it — treat as no_marker (malformed output).

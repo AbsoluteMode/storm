@@ -3,6 +3,8 @@ import { spawn } from 'node:child_process';
 import { buildInvocation } from './adapters.mjs';
 import { extractResult, salvageTail } from './result-parser.mjs';
 
+const MIN_SALVAGE_LENGTH = 40;
+
 export function runInvocation({ engine, cmd, args, input }, opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 180000;
   return new Promise((resolve) => {
@@ -43,7 +45,7 @@ export function runInvocation({ engine, cmd, args, input }, opts = {}) {
         // Only salvage on no_marker (not unterminated/empty_result — those had markers).
         if (parsed.reason === 'no_marker') {
           const salvaged = salvageTail(stdout);
-          if (salvaged.length >= 40) {
+          if (salvaged.length >= MIN_SALVAGE_LENGTH) {
             finish({ engine, status: 'salvaged', result: salvaged, error: 'no_marker (salvaged)' });
             return;
           }

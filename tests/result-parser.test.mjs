@@ -90,3 +90,8 @@ test('salvageTail: default maxLen is 2000', () => {
   const tail = salvageTail(longText);
   assert.equal(tail.length, 2000);
 });
+
+// Stray CLOSE with no preceding OPEN -> no_marker (previously untested reachable branch)
+test('stray CLOSE with no preceding OPEN -> no_marker', () => {
+  assert.deepEqual(extractResult('noise </STORM_RESULT> more'), { ok: false, reason: 'no_marker' });
+});
