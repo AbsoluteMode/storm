@@ -83,3 +83,17 @@ test('stdin mode: EPIPE on early-exit engine does not crash runInvocation', asyn
   // Should degrade gracefully, not throw
   assert.ok(['no_result', 'ok', 'error'].includes(r.status), `unexpected status: ${r.status}`);
 });
+
+// Bug B: salvage partial output when engine produces substantial output without markers
+
+test('Bug B: chatty mode (substantial output, no markers) -> status salvaged with non-empty result', async () => {
+  const r = await runInvocation(inv('chatty'), { timeoutMs: 5000 });
+  assert.equal(r.status, 'salvaged', `expected salvaged, got ${r.status}: ${r.error ?? ''}`);
+  assert.ok(typeof r.result === 'string' && r.result.length >= 40, `result should be at least 40 chars; got: ${JSON.stringify(r.result)}`);
+  assert.equal(r.engine, 'fake');
+});
+
+test('Bug B: trivial output (no markers, too short) -> stays no_result', async () => {
+  const r = await runInvocation(inv('tiny'), { timeoutMs: 5000 });
+  assert.equal(r.status, 'no_result', `expected no_result, got ${r.status}`);
+});

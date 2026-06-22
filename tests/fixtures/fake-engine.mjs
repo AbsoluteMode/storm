@@ -27,4 +27,13 @@ if (mode === 'ok') {
     process.stdout.write(`<STORM_RESULT>\n${data}\n</STORM_RESULT>\n`);
     process.exit(0);
   });
+} else if (mode === 'chatty') {
+  // Produces substantial output (>= 40 chars) WITHOUT any markers — simulates
+  // an engine that answered but forgot to wrap in STORM_RESULT tags.
+  process.stdout.write('This is a detailed analysis of the topic at hand. The engine produced a real answer but forgot to include the required STORM_RESULT markers. This content should be salvaged.\n');
+  process.exit(0);
+} else if (mode === 'tiny') {
+  // Produces trivial/short output without markers — too short to salvage.
+  process.stdout.write('ok\n');
+  process.exit(0);
 }

@@ -1,7 +1,7 @@
 // scripts/lib/run-engine.mjs
 import { spawn } from 'node:child_process';
 import { buildInvocation } from './adapters.mjs';
-import { extractResult } from './result-parser.mjs';
+import { extractResult, salvageTail } from './result-parser.mjs';
 
 export function runInvocation({ engine, cmd, args, input }, opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 180000;
@@ -38,6 +38,16 @@ export function runInvocation({ engine, cmd, args, input }, opts = {}) {
       if (parsed.ok) {
         finish({ engine, status: 'ok', result: parsed.result });
       } else {
+        // Salvage: when the engine produced substantial output but forgot markers,
+        // recover the tail rather than discarding the engine's work entirely.
+        // Only salvage on no_marker (not unterminated/empty_result — those had markers).
+        if (parsed.reason === 'no_marker') {
+          const salvaged = salvageTail(stdout);
+          if (salvaged.length >= 40) {
+            finish({ engine, status: 'salvaged', result: salvaged, error: 'no_marker (salvaged)' });
+            return;
+          }
+        }
         // stderr (not the model's stdout answer) is included for diagnostics; some CLIs echo prompt/model text here.
         const tail = stderr.trim().slice(0, 500);
         finish({ engine, status: 'no_result', error: tail ? `${parsed.reason}: ${tail}` : parsed.reason });
