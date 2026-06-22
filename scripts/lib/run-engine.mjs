@@ -7,7 +7,9 @@ export function runInvocation({ engine, cmd, args }, opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 180000;
   return new Promise((resolve) => {
     let stdout = '';
+    let stderr = '';
     let settled = false;
+    let timer;
     const finish = (res) => {
       if (settled) return;
       settled = true;
@@ -20,16 +22,21 @@ export function runInvocation({ engine, cmd, args }, opts = {}) {
     } catch (e) {
       return finish({ engine, status: 'error', error: e.message });
     }
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       child.kill('SIGKILL');
       finish({ engine, status: 'timeout', error: `timeout after ${timeoutMs}ms` });
     }, timeoutMs);
     child.stdout.on('data', (d) => { stdout += d; });
+    child.stderr.on('data', (d) => { stderr += d; });
     child.on('error', (e) => finish({ engine, status: 'error', error: e.message }));
     child.on('close', () => {
       const parsed = extractResult(stdout);
-      if (parsed.ok) finish({ engine, status: 'ok', result: parsed.result });
-      else finish({ engine, status: 'no_result', error: parsed.reason });
+      if (parsed.ok) {
+        finish({ engine, status: 'ok', result: parsed.result });
+      } else {
+        const tail = stderr.trim().slice(0, 500);
+        finish({ engine, status: 'no_result', error: tail ? `${parsed.reason}: ${tail}` : parsed.reason });
+      }
     });
   });
 }

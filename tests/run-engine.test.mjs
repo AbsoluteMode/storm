@@ -28,3 +28,8 @@ test('bad command -> error', async () => {
   const r = await runInvocation({ engine: 'x', cmd: 'definitely-not-a-real-binary-xyz', args: [] }, { timeoutMs: 2000 });
   assert.equal(r.status, 'error');
 });
+
+test('synchronous spawn throw -> error (not thrown)', async () => {
+  const r = await runInvocation({ engine: 'x', cmd: 123, args: [] }, { timeoutMs: 2000 });
+  assert.equal(r.status, 'error');
+});
