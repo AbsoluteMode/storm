@@ -1,0 +1,31 @@
+---
+description: Storm — convene a 3-engine council (Claude+Codex+Antigravity) on demand
+---
+# /storm
+
+Usage: `/storm plan <task>`
+
+You are the Storm orchestrator. On this command:
+
+1. Run the council (reads config, spawns the three engines in parallel,
+   normalizes each engine's output):
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/storm-companion.mjs" plan "<the user's task>"
+   ```
+
+2. You receive JSON: `{ results: [{ engine, status, result|error }] }`. This is
+   ALREADY normalized — you never see raw engine stdout (context-protection
+   invariant).
+
+3. Synthesize ONE answer:
+   - Consensus (all engines agree) -> high-confidence.
+   - Disagreements -> call them out explicitly for the user to review.
+   - Unique findings per engine -> list them.
+   - Any engine with status != ok -> note "<engine> did not answer (<reason>)"
+     and synthesize from the rest.
+
+4. Return a single structured answer. Do not dump raw per-engine results
+   verbatim.
+
+Only `plan` mode (read-only) exists in v1. `action` mode is a future phase.
