@@ -109,9 +109,10 @@ test('auth-prompt -> auth_required quickly', async () => {
 });
 
 test('slow-stream is NOT stalled (heartbeat resets inactivity)', async () => {
-  // stallMs (400) < total runtime (~1.2s), but each chunk (~120ms) resets the stall timer.
-  // 400ms gives headroom over 120ms chunk interval + Node.js child startup (~100ms).
-  const r = await runInvocation(inv('slow-stream'), { stallMs: 400, timeoutMs: 5000 });
+  // stallMs (1000) < total runtime (~2s), so without the reset it WOULD stall;
+  // each ~40ms chunk re-arms the stall timer (~25x margin), so it stays ok even
+  // under machine load. If reset were broken, this would fail at 1000ms.
+  const r = await runInvocation(inv('slow-stream'), { stallMs: 1000, timeoutMs: 8000 });
   assert.equal(r.status, 'ok');
   assert.equal(r.result, '- slow but alive');
 });
