@@ -11,10 +11,10 @@ You are the Storm orchestrator. On this command:
    normalizes each engine's output):
 
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/scripts/storm-companion.mjs" plan "<the user's task>"
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/storm-companion.mjs" plan "<task>"
    ```
 
-2. You receive JSON: `{ results: [{ engine, status, result|error }] }`. This is
+2. You receive JSON: `{ mode, task, results: [{ engine, status, result|error }] }`. This is
    ALREADY normalized — you never see raw engine stdout (context-protection
    invariant).
 
