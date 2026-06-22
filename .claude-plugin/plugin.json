@@ -1,0 +1,6 @@
+{
+  "name": "storm",
+  "version": "0.1.0",
+  "description": "Convene a council of three engines (Claude + Codex + Antigravity) on demand and synthesize one answer.",
+  "author": { "name": "max" }
+}

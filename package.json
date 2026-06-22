@@ -1,0 +1,10 @@
+{
+  "name": "storm",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Storm — multi-engine council for Claude Code (plan mode)",
+  "scripts": {
+    "test": "node --test"
+  }
+}

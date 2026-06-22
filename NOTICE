@@ -1,0 +1,6 @@
+Storm
+Copyright 2026 max
+
+This product's plugin structure (companion-runtime + skill contract +
+commands layout) is adapted from the "codex" plugin by OpenAI, licensed
+under the Apache License, Version 2.0.
