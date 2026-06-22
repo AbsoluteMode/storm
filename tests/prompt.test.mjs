@@ -17,3 +17,13 @@ test('defaults to reviewer role and omits repo line when absent', () => {
   assert.match(p, /review/i);
   assert.doesNotMatch(p, /Repository:/);
 });
+
+test('uses analyst role line for analyst role', () => {
+  const p = buildStormPrompt({ task: 'x', role: 'analyst' });
+  assert.match(p, /analy/i);
+});
+
+test('falls back to reviewer for unknown role', () => {
+  const p = buildStormPrompt({ task: 'x', role: 'nonsense' });
+  assert.match(p, /review/i);
+});
