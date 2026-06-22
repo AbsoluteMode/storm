@@ -1,0 +1,12 @@
+{
+  "name": "storm-marketplace",
+  "owner": {
+    "name": "max"
+  },
+  "plugins": [
+    {
+      "name": "storm",
+      "source": "./"
+    }
+  ]
+}
