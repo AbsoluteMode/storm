@@ -22,7 +22,11 @@ export function runInvocation({ engine, cmd, args }, opts = {}) {
     } catch (e) {
       return finish({ engine, status: 'error', error: e.message });
     }
+    // FIX: set UTF-8 encoding so multi-byte chars split across chunks decode correctly.
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
     timer = setTimeout(() => {
+      // v1: kills the direct child only; grandchildren spawned by the engine CLI may orphan on timeout.
       child.kill('SIGKILL');
       finish({ engine, status: 'timeout', error: `timeout after ${timeoutMs}ms` });
     }, timeoutMs);
@@ -34,6 +38,7 @@ export function runInvocation({ engine, cmd, args }, opts = {}) {
       if (parsed.ok) {
         finish({ engine, status: 'ok', result: parsed.result });
       } else {
+        // stderr (not the model's stdout answer) is included for diagnostics; some CLIs echo prompt/model text here.
         const tail = stderr.trim().slice(0, 500);
         finish({ engine, status: 'no_result', error: tail ? `${parsed.reason}: ${tail}` : parsed.reason });
       }
@@ -42,6 +47,11 @@ export function runInvocation({ engine, cmd, args }, opts = {}) {
 }
 
 export function runEngine(engineId, prompt, cfg = {}, opts = {}) {
-  const { cmd, args } = buildInvocation(engineId, prompt, cfg);
-  return runInvocation({ engine: engineId, cmd, args }, opts);
+  let inv;
+  try {
+    inv = buildInvocation(engineId, prompt, cfg);
+  } catch (e) {
+    return Promise.resolve({ engine: engineId, status: 'error', error: e.message });
+  }
+  return runInvocation({ engine: engineId, cmd: inv.cmd, args: inv.args }, opts);
 }

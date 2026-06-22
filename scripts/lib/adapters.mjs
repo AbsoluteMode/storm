@@ -14,7 +14,7 @@ const ADAPTERS = {
       '--model', cfg.model ?? 'Gemini 3.1 Pro (High)',
       '-p', prompt,
       '--dangerously-skip-permissions',
-      '--print-timeout', cfg.printTimeout ?? '120s',
+      '--print-timeout', cfg.printTimeout ?? '120s', // default when config omits the key
     ],
   },
 };
