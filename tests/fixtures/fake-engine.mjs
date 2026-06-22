@@ -1,5 +1,5 @@
 // tests/fixtures/fake-engine.mjs
-// modes: ok | nomarker | slow | utf8split  (arg 1)
+// modes: ok | nomarker | slow | utf8split | stdin  (arg 1)
 const mode = process.argv[2];
 if (mode === 'ok') {
   process.stdout.write('progress chatter...\n<STORM_RESULT>\n- ok finding\n</STORM_RESULT>\n');
@@ -17,4 +17,14 @@ if (mode === 'ok') {
   process.stdout.write(buf.subarray(0, 18));
   process.stdout.write(buf.subarray(18));
   process.exit(0);
+} else if (mode === 'stdin') {
+  // Read ALL of stdin then echo it inside STORM_RESULT markers.
+  // This lets tests assert that the prompt arrived via stdin, not argv.
+  let data = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (chunk) => { data += chunk; });
+  process.stdin.on('end', () => {
+    process.stdout.write(`<STORM_RESULT>\n${data}\n</STORM_RESULT>\n`);
+    process.exit(0);
+  });
 }

@@ -1,18 +1,30 @@
 // scripts/lib/adapters.mjs
+//
+// Each adapter returns { cmd, args } for argv flags only.
+// The prompt travels via stdin (the `input` field added by buildInvocation),
+// NOT as an argv element — avoids OS ARG_MAX failures on large prompts.
+//
+// Stdin forms verified 2026-06-22:
+//   claude  : `claude -p`           — no prompt arg; -p with no argument reads stdin
+//   codex   : `codex exec`          — no prompt arg; reads stdin when arg omitted
+//   agy     : `agy --model M -p ...`— no prompt arg; -p with no argument reads stdin
+//
+// WHY: docs/decisions/ (ARG_MAX fix, v1.1)
+
 const ADAPTERS = {
   claude: {
     cmd: 'claude',
-    buildArgs: (prompt, cfg) => ['-p', prompt, ...(cfg.model ? ['--model', cfg.model] : [])],
+    buildArgs: (_prompt, cfg) => ['-p', ...(cfg.model ? ['--model', cfg.model] : [])],
   },
   codex: {
     cmd: 'codex',
-    buildArgs: (prompt) => ['exec', prompt],
+    buildArgs: () => ['exec'],
   },
   antigravity: {
     cmd: 'agy',
-    buildArgs: (prompt, cfg) => [
+    buildArgs: (_prompt, cfg) => [
       '--model', cfg.model ?? 'Gemini 3.1 Pro (High)',
-      '-p', prompt,
+      '-p',
       '--dangerously-skip-permissions',
       '--print-timeout', cfg.printTimeout ?? '120s', // default when config omits the key
     ],
@@ -22,5 +34,5 @@ const ADAPTERS = {
 export function buildInvocation(engineId, prompt, cfg = {}) {
   const a = ADAPTERS[engineId];
   if (!a) throw new Error(`unknown engine: ${engineId}`);
-  return { cmd: a.cmd, args: a.buildArgs(prompt, cfg) };
+  return { cmd: a.cmd, args: a.buildArgs(prompt, cfg), input: prompt };
 }
