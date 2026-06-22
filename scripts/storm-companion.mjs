@@ -13,6 +13,7 @@ async function main() {
     role: cfg.role,
     repoPath: process.cwd(),
     timeoutMs: cfg.timeoutMs,
+    stallMs: cfg.stallMs,
   });
   process.stdout.write(JSON.stringify({ mode, task, results }, null, 2) + '\n');
 }

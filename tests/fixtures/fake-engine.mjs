@@ -37,3 +37,24 @@ if (mode === 'ok') {
   process.stdout.write('ok\n');
   process.exit(0);
 }
+// silent-hang: produce NO output and never exit on its own (until killed)
+else if (mode === 'silent-hang') {
+  setInterval(() => {}, 1000); // keep process alive, emit nothing
+}
+// auth-prompt: emit a CLI auth-failure line, then keep quiet
+else if (mode === 'auth-prompt') {
+  process.stdout.write('You are not logged in. Run `claude login` to continue.\n');
+  setInterval(() => {}, 1000);
+}
+// slow-stream: emit a heartbeat chunk every 120ms for ~1.2s, then a valid result
+else if (mode === 'slow-stream') {
+  let n = 0;
+  const iv = setInterval(() => {
+    process.stdout.write(`. tick ${n}\n`);
+    if (++n >= 10) {
+      clearInterval(iv);
+      process.stdout.write('<STORM_RESULT>\n- slow but alive\n</STORM_RESULT>\n');
+      process.exit(0);
+    }
+  }, 120);
+}

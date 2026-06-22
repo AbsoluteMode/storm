@@ -2,21 +2,27 @@
 import { spawn } from 'node:child_process';
 import { buildInvocation } from './adapters.mjs';
 import { extractResult, salvageTail } from './result-parser.mjs';
+import { detectAuthPrompt } from './auth-detect.mjs';
 
 const MIN_SALVAGE_LENGTH = 40;
+const AUTH_SCAN_TAIL = 1000; // scan only the recent tail for auth prompts (cheap, catches splits)
 
 export function runInvocation({ engine, cmd, args, input }, opts = {}) {
-  const timeoutMs = opts.timeoutMs ?? 180000;
+  const timeoutMs = opts.timeoutMs ?? 300000; // far backstop, not the primary trigger
+  const stallMs = opts.stallMs ?? 90000;      // inactivity (primary trigger)
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
     let settled = false;
-    let timer;
+    let lastActivity = Date.now();
+    let backstopTimer;
+    let stallTimer;
+    const clearTimers = () => { clearTimeout(backstopTimer); clearTimeout(stallTimer); };
     const finish = (res) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
-      resolve(res);
+      clearTimers();
+      resolve({ ...res, lastActivityMs: Date.now() - lastActivity });
     };
     let child;
     try {
@@ -27,13 +33,32 @@ export function runInvocation({ engine, cmd, args, input }, opts = {}) {
     // FIX: set UTF-8 encoding so multi-byte chars split across chunks decode correctly.
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
-    timer = setTimeout(() => {
-      // v1: kills the direct child only; grandchildren spawned by the engine CLI may orphan on timeout.
+
+    const armStall = () => {
+      clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        child.kill('SIGKILL');
+        finish({ engine, status: 'stalled', error: `no output for ${stallMs}ms` });
+      }, stallMs);
+    };
+    // v1: kills the direct child only; grandchildren spawned by the engine CLI may orphan on timeout.
+    backstopTimer = setTimeout(() => {
       child.kill('SIGKILL');
       finish({ engine, status: 'timeout', error: `timeout after ${timeoutMs}ms` });
     }, timeoutMs);
-    child.stdout.on('data', (d) => { stdout += d; });
-    child.stderr.on('data', (d) => { stderr += d; });
+    armStall();
+
+    const onActivity = () => {
+      lastActivity = Date.now();
+      armStall(); // reset inactivity timer on any output
+      const tail = (stdout.slice(-AUTH_SCAN_TAIL)) + '\n' + (stderr.slice(-AUTH_SCAN_TAIL));
+      if (detectAuthPrompt(tail)) {
+        child.kill('SIGKILL');
+        finish({ engine, status: 'auth_required', error: 'authentication prompt detected' });
+      }
+    };
+    child.stdout.on('data', (d) => { stdout += d; onActivity(); });
+    child.stderr.on('data', (d) => { stderr += d; onActivity(); });
     child.on('error', (e) => finish({ engine, status: 'error', error: e.message }));
     child.on('close', () => {
       const parsed = extractResult(stdout);

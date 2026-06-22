@@ -9,7 +9,7 @@ export async function runAll(task, engines, opts = {}) {
   const settled = await Promise.allSettled(
     engines.map((e) => {
       try {
-        return runner(e.id, prompt, e, { timeoutMs: opts.timeoutMs });
+        return runner(e.id, prompt, e, { timeoutMs: opts.timeoutMs, stallMs: opts.stallMs });
       } catch (err) {
         return Promise.reject(err);
       }

@@ -96,3 +96,28 @@ test('Bug B: trivial output (no markers, too short) -> stays no_result', async (
   const r = await runInvocation(inv('tiny'), { timeoutMs: 5000 });
   assert.equal(r.status, 'no_result', `expected no_result, got ${r.status}`);
 });
+
+test('silent-hang -> stalled (no output past stallMs)', async () => {
+  const r = await runInvocation(inv('silent-hang'), { stallMs: 300, timeoutMs: 5000 });
+  assert.equal(r.status, 'stalled');
+  assert.ok(typeof r.lastActivityMs === 'number');
+});
+
+test('auth-prompt -> auth_required quickly', async () => {
+  const r = await runInvocation(inv('auth-prompt'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.status, 'auth_required');
+});
+
+test('slow-stream is NOT stalled (heartbeat resets inactivity)', async () => {
+  // stallMs (400) < total runtime (~1.2s), but each chunk (~120ms) resets the stall timer.
+  // 400ms gives headroom over 120ms chunk interval + Node.js child startup (~100ms).
+  const r = await runInvocation(inv('slow-stream'), { stallMs: 400, timeoutMs: 5000 });
+  assert.equal(r.status, 'ok');
+  assert.equal(r.result, '- slow but alive');
+});
+
+test('ok result carries lastActivityMs', async () => {
+  const r = await runInvocation(inv('ok'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.status, 'ok');
+  assert.ok(typeof r.lastActivityMs === 'number');
+});

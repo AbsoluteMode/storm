@@ -1,9 +1,10 @@
 {
   "role": "reviewer",
-  "timeoutMs": 180000,
+  "timeoutMs": 300000,
+  "stallMs": 90000,
   "engines": [
     { "id": "claude", "model": null },
     { "id": "codex" },
-    { "id": "antigravity", "model": "Gemini 3.1 Pro (High)", "printTimeout": "150s" }
+    { "id": "antigravity", "model": "Gemini 3.1 Pro (High)", "printTimeout": "280s" }
   ]
 }

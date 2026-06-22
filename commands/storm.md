@@ -22,8 +22,8 @@ You are the Storm orchestrator. On this command:
    - Consensus (all engines agree) -> high-confidence.
    - Disagreements -> call them out explicitly for the user to review.
    - Unique findings per engine -> list them.
-   - Any engine with status != ok -> note "<engine> did not answer (<reason>)"
-     and synthesize from the rest.
+   - Any engine with status != ok (stalled / auth_required / timeout / no_result / error) ->
+     note "<engine> did not answer (<status>)" and synthesize from the rest.
 
 4. Return a single structured answer. Do not dump raw per-engine results
    verbatim.
