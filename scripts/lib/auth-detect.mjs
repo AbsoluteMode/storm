@@ -5,8 +5,10 @@
 const AUTH_PATTERNS = [
   /\bnot (authenticated|logged in|signed in)\b/i,
   /\bplease (re-?)?(authenticate|sign in|log in)\b/i,
-  /\b(run|execute) `?[a-z]+ login`?/i,          // "run `claude login`"
-  /\bsign in with (chatgpt|google|github|your)\b/i,
+  /\b(run|execute) `?(claude|codex|agy|gemini) login\b/i,   // "Run `claude login`" — our engines only
+  /\bsign in with (chatgpt|google|github)\b/i,
+  /\bsign in to continue\b/i,
+  /\bsession (has )?expired\b/i,
   /\bauthentication (required|failed)\b/i,
   /\bvisit https?:\/\/\S+ to (sign in|log in|authenticate)\b/i,
 ];
