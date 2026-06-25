@@ -154,3 +154,27 @@ test('gemini: custom model honored', () => {
 test('gemini: missing apiKey throws a clear error', () => {
   assert.throws(() => buildInvocation('gemini', 'PROMPT', {}), /gemini.*apiKey|OpenRouter/i);
 });
+
+// --- explicit reasoning levels (deterministic, not env-inherited) ---
+
+test('glm: --effort appended when cfg.effort is set', () => {
+  const inv = buildInvocation('glm', 'P', { apiKey: 'K', effort: 'max' });
+  const i = inv.args.indexOf('--effort');
+  assert.ok(i >= 0, '--effort must be present');
+  assert.equal(inv.args[i + 1], 'max');
+});
+
+test('glm: no --effort when cfg.effort unset', () => {
+  const inv = buildInvocation('glm', 'P', { apiKey: 'K' });
+  assert.ok(!inv.args.includes('--effort'));
+});
+
+test('gemini: reasoning effort passed as 3rd arg (default high)', () => {
+  const inv = buildInvocation('gemini', 'P', { apiKey: 'K' });
+  assert.equal(inv.args[2], 'high');
+});
+
+test('gemini: custom reasoning honored', () => {
+  const inv = buildInvocation('gemini', 'P', { apiKey: 'K', reasoning: 'medium' });
+  assert.equal(inv.args[2], 'medium');
+});

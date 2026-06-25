@@ -5,7 +5,7 @@
   "engines": [
     { "id": "claude", "model": null },
     { "id": "codex" },
-    { "id": "glm", "model": "glm-5.2" },
-    { "id": "gemini", "model": "google/gemini-3.5-flash" }
+    { "id": "glm", "model": "glm-5.2", "effort": "max" },
+    { "id": "gemini", "model": "google/gemini-3.5-flash", "reasoning": "high" }
   ]
 }

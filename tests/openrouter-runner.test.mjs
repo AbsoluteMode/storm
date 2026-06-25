@@ -1,7 +1,20 @@
 // tests/openrouter-runner.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSSELine } from '../scripts/lib/openrouter-runner.mjs';
+import { parseSSELine, buildBody } from '../scripts/lib/openrouter-runner.mjs';
+
+test('buildBody: includes reasoning effort when provided', () => {
+  const b = buildBody('google/gemini-3.5-flash', 'prompt text', 'high');
+  assert.deepEqual(b.reasoning, { effort: 'high' });
+  assert.equal(b.stream, true);
+  assert.equal(b.model, 'google/gemini-3.5-flash');
+  assert.deepEqual(b.messages, [{ role: 'user', content: 'prompt text' }]);
+});
+
+test('buildBody: omits reasoning when effort not provided', () => {
+  const b = buildBody('m', 'p', undefined);
+  assert.equal(b.reasoning, undefined);
+});
 
 test('parseSSELine: content delta extracted to content channel', () => {
   const line = 'data: ' + JSON.stringify({ choices: [{ delta: { content: 'hello' } }] });

@@ -29,8 +29,16 @@ export function parseSSELine(line) {
   };
 }
 
+// Pure: build the OpenRouter request body. Adds reasoning effort when provided.
+export function buildBody(model, prompt, reasoningEffort) {
+  const body = { model, stream: true, messages: [{ role: 'user', content: prompt }] };
+  if (reasoningEffort) body.reasoning = { effort: reasoningEffort };
+  return body;
+}
+
 async function main() {
   const model = process.argv[2] || 'google/gemini-3.5-flash';
+  const reasoningEffort = process.argv[3] || undefined;
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) { process.stderr.write('openrouter: missing OPENROUTER_API_KEY\n'); process.exit(1); }
 
@@ -43,7 +51,7 @@ async function main() {
     res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, stream: true, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify(buildBody(model, prompt, reasoningEffort)),
     });
   } catch (e) {
     process.stderr.write(`openrouter fetch failed: ${e.message}\n`);

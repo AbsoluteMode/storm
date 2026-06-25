@@ -39,7 +39,7 @@ const ADAPTERS = {
   glm: {
     cmd: 'claude',
     stream: true,
-    buildArgs: (_prompt, cfg) => ['-p', '--model', cfg.model ?? 'glm-5.2', ...STREAM_FLAGS],
+    buildArgs: (_prompt, cfg) => ['-p', '--model', cfg.model ?? 'glm-5.2', ...STREAM_FLAGS, ...(cfg.effort ? ['--effort', cfg.effort] : [])],
     buildEnv: (cfg) => {
       if (!cfg.apiKey) throw new Error('glm: missing apiKey (z.ai key required — set it in .storm-secrets.json)');
       return {
@@ -58,7 +58,7 @@ const ADAPTERS = {
   // "binary". content -> stdout (answer), reasoning -> stderr (heartbeat).
   gemini: {
     cmd: process.execPath, // node
-    buildArgs: (_prompt, cfg) => [OPENROUTER_RUNNER, cfg.model ?? 'google/gemini-3.5-flash'],
+    buildArgs: (_prompt, cfg) => [OPENROUTER_RUNNER, cfg.model ?? 'google/gemini-3.5-flash', cfg.reasoning ?? 'high'],
     buildEnv: (cfg) => {
       if (!cfg.apiKey) throw new Error('gemini: missing apiKey (OpenRouter key required — set openrouterApiKey in .storm-secrets.json)');
       return { OPENROUTER_API_KEY: cfg.apiKey };
