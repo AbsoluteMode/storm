@@ -129,3 +129,28 @@ test('antigravity: NOT a stream engine', () => {
   const inv = buildInvocation('antigravity', 'PROMPT', { model: 'M' });
   assert.equal(inv.stream, false);
 });
+
+// --- gemini (OpenRouter HTTP wrapper engine) ---
+
+test('gemini: runs the openrouter wrapper via node; default model; not a stream engine', () => {
+  const inv = buildInvocation('gemini', 'PROMPT', { apiKey: 'K' });
+  assert.equal(inv.stream, false);
+  assert.equal(inv.input, 'PROMPT');
+  assert.ok(inv.args[0].endsWith('openrouter-runner.mjs'), 'first arg must be the runner path');
+  assert.equal(inv.args[1], 'google/gemini-3.5-flash');
+  assert.ok(!inv.args.includes('PROMPT'), 'prompt must travel via stdin, not args');
+});
+
+test('gemini: env carries OPENROUTER_API_KEY from apiKey', () => {
+  const { env } = buildInvocation('gemini', 'PROMPT', { apiKey: 'SECRET' });
+  assert.equal(env.OPENROUTER_API_KEY, 'SECRET');
+});
+
+test('gemini: custom model honored', () => {
+  const inv = buildInvocation('gemini', 'PROMPT', { apiKey: 'K', model: 'google/gemini-2.5-flash' });
+  assert.equal(inv.args[1], 'google/gemini-2.5-flash');
+});
+
+test('gemini: missing apiKey throws a clear error', () => {
+  assert.throws(() => buildInvocation('gemini', 'PROMPT', {}), /gemini.*apiKey|OpenRouter/i);
+});

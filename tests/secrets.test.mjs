@@ -51,3 +51,16 @@ test('injectSecrets does not mutate the input engine objects', () => {
   injectSecrets(engines, { glmApiKey: 'X' });
   assert.equal(engines[0].apiKey, undefined, 'original config must stay unmutated');
 });
+
+test('injectSecrets puts openrouterApiKey onto the gemini engine only', () => {
+  const engines = [{ id: 'claude' }, { id: 'gemini', model: 'google/gemini-3.5-flash' }, { id: 'glm' }];
+  const out = injectSecrets(engines, { openrouterApiKey: 'OR', glmApiKey: 'GL' });
+  assert.equal(out.find((e) => e.id === 'gemini').apiKey, 'OR');
+  assert.equal(out.find((e) => e.id === 'glm').apiKey, 'GL');
+  assert.equal(out.find((e) => e.id === 'claude').apiKey, undefined);
+});
+
+test('injectSecrets without openrouterApiKey leaves gemini without apiKey', () => {
+  const out = injectSecrets([{ id: 'gemini' }], {});
+  assert.equal(out[0].apiKey, undefined);
+});
