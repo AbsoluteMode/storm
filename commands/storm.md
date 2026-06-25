@@ -1,5 +1,5 @@
 ---
-description: Storm — convene a 3-engine council (Claude+Codex+GLM) on demand
+description: Storm — convene a 4-engine council (Claude+Codex+GLM+Gemini) on demand
 ---
 # /storm
 

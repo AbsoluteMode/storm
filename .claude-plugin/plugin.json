@@ -1,6 +1,6 @@
 {
   "name": "storm",
   "version": "0.6.0",
-  "description": "Convene a council of three engines (Claude + Codex + GLM) on demand and synthesize one answer.",
+  "description": "Convene a council of four engines (Claude + Codex + GLM + Gemini) on demand and synthesize one answer.",
   "author": { "name": "max" }
 }

@@ -6,16 +6,16 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D20-green?style=flat-square)
 ![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen?style=flat-square)
 
-Storm runs your prompt through three independent engines in parallel — **Claude**, **Codex** (GPT), and **GLM** (z.ai) — then synthesizes their outputs into one answer: consensus, disagreements, and unique findings. Different model weights make uncorrelated mistakes, so the synthesis keeps what they agree on and surfaces what only one caught.
+Storm runs your prompt through four independent engines in parallel — **Claude**, **Codex** (GPT), **GLM** (z.ai), and **Gemini** (Google, via OpenRouter) — then synthesizes their outputs into one answer: consensus, disagreements, and unique findings. Different model weights make uncorrelated mistakes, so the synthesis keeps what they agree on and surfaces what only one caught.
 
 It's a Claude Code plugin. One command: `/storm plan <task>`.
 
 > [!NOTE]
-> Storm uses your own CLI subscriptions (Claude, Codex) as headless subprocesses — no API keys for those. The only key it needs is a z.ai key for the GLM engine, and that stays on your machine.
+> Claude and Codex run on your own CLI subscriptions (no API keys). GLM and Gemini use keys you provide, kept in a local gitignored file. A missing key just drops that engine — the council runs with whoever's available.
 
 ## Why
 
-Three frontier models in a blind comparison beat any single one of them. Storm is a small, practical take on [Mixture-of-Agents](https://arxiv.org/abs/2406.04692): fan a task out to a diverse council, then synthesize. It shines for review, root-cause analysis, design critique, and second opinions — the cases where one model's blind spot is another's easy catch.
+Frontier models in a blind comparison beat any single one of them. Storm is a small, practical take on [Mixture-of-Agents](https://arxiv.org/abs/2406.04692): fan a task out to a diverse council, then synthesize. It shines for review, root-cause analysis, design critique, and second opinions — the cases where one model's blind spot is another's easy catch.
 
 ## How it works
 
@@ -24,24 +24,26 @@ Three frontier models in a blind comparison beat any single one of them. Storm i
         │
         ├─▶ claude  ─┐
         ├─▶ codex   ─┤  parallel, each wraps its answer in <STORM_RESULT>…</STORM_RESULT>
-        └─▶ glm     ─┘
+        ├─▶ glm     ─┤
+        └─▶ gemini  ─┘
                      │
                      ▼
         orchestrator extracts each block → synthesizes one answer
         (consensus / disagreements / unique findings)
 ```
 
-- **On your subscriptions.** Each engine is a headless CLI subprocess running on your own plan. Claude and Codex use their logged-in sessions; GLM uses your z.ai key, injected into an isolated subprocess so your own Claude Code stays on Anthropic.
+- **On your own accounts.** Each engine is a headless subprocess. Claude and Codex use their logged-in CLI sessions; GLM and Gemini use your keys. GLM runs through the Claude harness pointed at z.ai (isolated config dir, so your own Claude Code stays on Anthropic); Gemini runs through a tiny OpenRouter wrapper.
 - **Context-protected.** The orchestrator never sees raw engine chatter — only the `<STORM_RESULT>` block each engine emits. A misbehaving engine can't bloat your context.
 - **Resilient.** A failed, stalled, or auth-blocked engine degrades gracefully; the council synthesizes from whoever answered.
-- **Live heartbeat.** Claude and GLM are silent while reasoning. Storm runs them with `--output-format stream-json`, turning their event stream into a liveness signal so a working-but-silent engine is never killed mid-thought.
+- **Live heartbeat.** Engines are silent while reasoning. Storm reads their event/reasoning stream (Claude/GLM via `stream-json`, Gemini via SSE reasoning deltas) as a liveness signal, so a working-but-silent engine is never killed mid-thought.
 
 ## Requirements
 
 - Node.js 20+
 - [`claude`](https://docs.claude.com/en/docs/claude-code) CLI — installed and authenticated
 - [`codex`](https://github.com/openai/codex) CLI — installed and authenticated
-- A [z.ai GLM Coding Plan](https://z.ai/subscribe) API key (for the GLM engine — optional, see below)
+- *(optional)* a [z.ai GLM Coding Plan](https://z.ai/subscribe) key — for the GLM engine
+- *(optional)* an [OpenRouter](https://openrouter.ai/keys) key — for the Gemini engine
 
 ## Install
 
@@ -50,17 +52,21 @@ Three frontier models in a blind comparison beat any single one of them. Storm i
 /plugin install storm@storm-marketplace
 ```
 
-Then configure the GLM key (below). Without it, Storm runs as a Claude + Codex duo — still a valid ensemble.
+Then add engine keys (below). With no keys, Storm runs as a Claude + Codex duo — still a valid ensemble.
 
-## GLM setup (z.ai)
+## Engine keys
 
-Storm's third engine is GLM, run through the Claude Code harness pointed at z.ai's Anthropic-compatible endpoint. Get an API key from the [z.ai API console](https://z.ai/manage-apikey/apikey-list) (GLM Coding Plan), then create `.storm-secrets.json` in the plugin root:
+GLM and Gemini need keys. Put them in `.storm-secrets.json` in the plugin root — it's gitignored and never leaves your machine:
 
 ```json
-{ "glmApiKey": "your-z.ai-key" }
+{
+  "glmApiKey": "your-z.ai-key",
+  "openrouterApiKey": "your-openrouter-key"
+}
 ```
 
-This file is gitignored and never leaves your machine. The key is injected only into the GLM subprocess, which runs with an isolated `CLAUDE_CONFIG_DIR` — your own Claude Code session is untouched and stays on Anthropic.
+- **GLM** — get a key from the [z.ai console](https://z.ai/manage-apikey/apikey-list). It's injected only into the GLM subprocess, which runs with an isolated `CLAUDE_CONFIG_DIR`; your own Claude Code session is untouched and stays on Anthropic.
+- **Gemini** — get a key from [OpenRouter](https://openrouter.ai/keys). Gemini is billed per token (cheap for occasional council runs); Claude/Codex/GLM are flat-rate subscriptions. Either key is optional — omit one and that engine is simply skipped.
 
 ## Usage
 
@@ -84,10 +90,12 @@ Storm is read-only (`plan`): review, RCA, analysis, second opinions. Examples:
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `engines` | `claude`, `codex`, `glm` | The council. An optional `antigravity` adapter (Gemini via the `agy` CLI) is included for those who have it. |
+| `engines` | `claude`, `codex`, `glm`, `gemini` | The council. An optional `antigravity` adapter (Gemini via the `agy` CLI) is also included. |
 | `role` | `reviewer` | Framing handed to each engine. |
 | `stallMs` | `60000` | Inactivity watchdog. Stream engines emit a real heartbeat, so silence past this means a genuine hang. |
 | `timeoutMs` | `480000` | Absolute backstop, never the primary trigger. |
+
+Per-engine reasoning is explicit: `glm` runs at `effort: "max"`, `gemini` at `reasoning: "high"`. Tune them per engine in the config.
 
 ## Architecture
 
@@ -98,13 +106,14 @@ Plain Node ESM, **zero runtime dependencies**, tested with `node --test`.
   - `adapters.mjs` — per-engine invocation (cmd, args, env, stream flag)
   - `fan-out.mjs` — parallel runner, `Promise.allSettled` with per-engine isolation
   - `run-engine.mjs` — spawn + NDJSON accumulator + inactivity/auth/timeout watchdogs
+  - `openrouter-runner.mjs` — HTTP wrapper engine (Gemini via OpenRouter SSE; reasoning → heartbeat)
   - `result-parser.mjs` — extract the last complete `<STORM_RESULT>` block; salvage partials
   - `auth-detect.mjs` — recognize CLI auth prompts (with a grace window for noisy engines)
-  - `secrets.mjs` — load the local z.ai key, inject into the GLM engine
+  - `secrets.mjs` — load local keys, inject into the matching engine
   - `prompt.mjs` — build the council prompt + marker contract
 - `commands/storm.md`, `skills/storm-runtime/SKILL.md` — orchestrator contract
 
-Design docs live in [`docs/specs/`](docs/specs/); implementation plans in [`docs/plans/`](docs/plans/).
+Design docs in [`docs/specs/`](docs/specs/); implementation plans in [`docs/plans/`](docs/plans/).
 
 Run the tests:
 
