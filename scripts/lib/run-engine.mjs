@@ -7,7 +7,7 @@ import { detectAuthPrompt } from './auth-detect.mjs';
 const MIN_SALVAGE_LENGTH = 40;
 const AUTH_SCAN_TAIL = 1000; // scan only the recent tail for auth prompts (cheap, catches splits)
 
-export function runInvocation({ engine, cmd, args, input }, opts = {}) {
+export function runInvocation({ engine, cmd, args, input, env }, opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 300000; // far backstop, not the primary trigger
   const stallMs = opts.stallMs ?? 90000;      // inactivity (primary trigger)
   return new Promise((resolve) => {
@@ -26,7 +26,12 @@ export function runInvocation({ engine, cmd, args, input }, opts = {}) {
     };
     let child;
     try {
-      child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+      // Merge per-engine env over the inherited environment (glm redirects the
+      // Claude Code backend to z.ai this way). undefined env => inherit unchanged.
+      child = spawn(cmd, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: env ? { ...process.env, ...env } : process.env,
+      });
     } catch (e) {
       return finish({ engine, status: 'error', error: e.message });
     }
@@ -115,5 +120,5 @@ export function runEngine(engineId, prompt, cfg = {}, opts = {}) {
   } catch (e) {
     return Promise.resolve({ engine: engineId, status: 'error', error: e.message });
   }
-  return runInvocation({ engine: engineId, cmd: inv.cmd, args: inv.args, input: inv.input }, opts);
+  return runInvocation({ engine: engineId, cmd: inv.cmd, args: inv.args, input: inv.input, env: inv.env }, opts);
 }

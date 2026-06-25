@@ -10,6 +10,8 @@ const AUTH_PATTERNS = [
   /\bsign in to continue\b/i,
   /\bsession (has )?expired\b/i,
   /\bauthentication (required|failed)\b/i,
+  /\bfailed to authenticate\b/i,            // Claude / Anthropic-compatible CLI auth-failure prefix
+  /\bAPI Error: 401\b/i,                    // 401 Unauthorized from an Anthropic-compatible backend (z.ai/Anthropic) — kills the dead-key 209s hang
   /\bvisit https?:\/\/\S+ to (sign in|log in|authenticate)\b/i,
 ];
 

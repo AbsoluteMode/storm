@@ -46,6 +46,15 @@ else if (mode === 'auth-prompt') {
   process.stdout.write('You are not logged in. Run `claude login` to continue.\n');
   setInterval(() => {}, 1000);
 }
+// echo-env: echo a custom env var + whether PATH was inherited. Lets tests assert
+// that per-engine env is MERGED into the child (custom var delivered) rather than
+// REPLACING the inherited environment (PATH must survive).
+else if (mode === 'echo-env') {
+  const v = process.env.STORM_TEST_VAR ?? 'UNSET';
+  const path = process.env.PATH ? 'PATH_PRESENT' : 'PATH_MISSING';
+  process.stdout.write(`<STORM_RESULT>\n${v}|${path}\n</STORM_RESULT>\n`);
+  process.exit(0);
+}
 // slow-stream: emit a heartbeat chunk every 40ms for ~2s, then a valid result.
 // Frequent chunks (40ms) vs the test's stallMs (1000ms) give a ~25x margin so
 // the "heartbeat resets stall" test stays green even under machine load.

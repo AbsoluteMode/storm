@@ -122,3 +122,23 @@ test('ok result carries lastActivityMs', async () => {
   assert.equal(r.status, 'ok');
   assert.ok(typeof r.lastActivityMs === 'number');
 });
+
+// --- per-engine env (glm backend override travels this path) ---
+
+test('env field is merged into child: custom var delivered, parent PATH preserved', async () => {
+  const r = await runInvocation(
+    { engine: 'fake', cmd: process.execPath, args: [FAKE, 'echo-env'], env: { STORM_TEST_VAR: 'hello-glm' } },
+    { timeoutMs: 5000 },
+  );
+  assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
+  assert.equal(r.result, 'hello-glm|PATH_PRESENT');
+});
+
+test('no env field: child still inherits parent env (PATH present), custom var unset', async () => {
+  const r = await runInvocation(
+    { engine: 'fake', cmd: process.execPath, args: [FAKE, 'echo-env'] },
+    { timeoutMs: 5000 },
+  );
+  assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
+  assert.equal(r.result, 'UNSET|PATH_PRESENT');
+});

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
 import { runAll } from './lib/fan-out.mjs';
+import { loadSecrets, injectSecrets } from './lib/secrets.mjs';
 
 async function main() {
   const [mode, task] = process.argv.slice(2);
@@ -9,7 +10,9 @@ async function main() {
     process.exit(2);
   }
   const cfg = JSON.parse(await readFile(new URL('./config.json', import.meta.url), 'utf8'));
-  const results = await runAll(task, cfg.engines, {
+  // Inject local secrets (z.ai/GLM key) into the matching engine; absent file => engines unchanged.
+  const engines = injectSecrets(cfg.engines, loadSecrets());
+  const results = await runAll(task, engines, {
     role: cfg.role,
     repoPath: process.cwd(),
     timeoutMs: cfg.timeoutMs,

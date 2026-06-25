@@ -3,3 +3,9 @@ node_modules/
 .DS_Store
 /tmp/
 .superpowers/
+
+# secrets — never commit
+.storm-secrets.json
+*.secret
+.env
+.env.*
