@@ -9,10 +9,13 @@
 //   codex   : `codex exec`          — no prompt arg; reads stdin when arg omitted
 //   agy     : `agy --model M -p ...`— no prompt arg; -p with no argument reads stdin
 
+const STREAM_FLAGS = ['--output-format', 'stream-json', '--verbose', '--include-partial-messages'];
+
 const ADAPTERS = {
   claude: {
     cmd: 'claude',
-    buildArgs: (_prompt, cfg) => ['-p', ...(cfg.model ? ['--model', cfg.model] : [])],
+    stream: true,
+    buildArgs: (_prompt, cfg) => ['-p', ...(cfg.model ? ['--model', cfg.model] : []), ...STREAM_FLAGS],
   },
   codex: {
     cmd: 'codex',
@@ -32,7 +35,8 @@ const ADAPTERS = {
   // Claude Code stays on Anthropic). The key travels as ANTHROPIC_AUTH_TOKEN.
   glm: {
     cmd: 'claude',
-    buildArgs: (_prompt, cfg) => ['-p', '--model', cfg.model ?? 'glm-5.2'],
+    stream: true,
+    buildArgs: (_prompt, cfg) => ['-p', '--model', cfg.model ?? 'glm-5.2', ...STREAM_FLAGS],
     buildEnv: (cfg) => {
       if (!cfg.apiKey) throw new Error('glm: missing apiKey (z.ai key required — set it in .storm-secrets.json)');
       return {
@@ -53,5 +57,5 @@ export function buildInvocation(engineId, prompt, cfg = {}) {
   if (!a) throw new Error(`unknown engine: ${engineId}`);
   // env is per-engine backend config (only glm needs it today); undefined for the rest.
   const env = a.buildEnv ? a.buildEnv(cfg) : undefined;
-  return { cmd: a.cmd, args: a.buildArgs(prompt, cfg), input: prompt, env };
+  return { cmd: a.cmd, args: a.buildArgs(prompt, cfg), input: prompt, env, stream: a.stream ?? false };
 }

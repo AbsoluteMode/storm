@@ -14,10 +14,10 @@ test('claude: prompt is in input, NOT in args', () => {
 
 test('claude: -p flag present, no prompt arg; model appended when set', () => {
   const { args: argsNoModel } = buildInvocation('claude', 'PROMPT', {});
-  assert.deepEqual(argsNoModel, ['-p']);
+  assert.deepEqual(argsNoModel.slice(0, 1), ['-p']);
 
   const { args: argsModel } = buildInvocation('claude', 'PROMPT', { model: 'opus' });
-  assert.deepEqual(argsModel, ['-p', '--model', 'opus']);
+  assert.deepEqual(argsModel.slice(0, 3), ['-p', '--model', 'opus']);
 });
 
 test('codex: prompt is in input, NOT in args', () => {
@@ -60,12 +60,12 @@ test('glm: prompt is in input NOT args; cmd=claude; default model glm-5.2', () =
   assert.equal(cmd, 'claude');
   assert.equal(input, 'PROMPT');
   assert.ok(!args.includes('PROMPT'), 'prompt must not appear in args');
-  assert.deepEqual(args, ['-p', '--model', 'glm-5.2']);
+  assert.deepEqual(args.slice(0, 3), ['-p', '--model', 'glm-5.2']);
 });
 
 test('glm: custom model from cfg.model is honored', () => {
   const { args } = buildInvocation('glm', 'PROMPT', { apiKey: 'KEY', model: 'glm-5.2[1m]' });
-  assert.deepEqual(args, ['-p', '--model', 'glm-5.2[1m]']);
+  assert.deepEqual(args.slice(0, 3), ['-p', '--model', 'glm-5.2[1m]']);
 });
 
 test('glm: env carries z.ai backend override; apiKey lands in ANTHROPIC_AUTH_TOKEN', () => {
@@ -99,4 +99,33 @@ test('non-glm engines carry no env (backward compat)', () => {
   assert.equal(buildInvocation('claude', 'P', {}).env, undefined);
   assert.equal(buildInvocation('codex', 'P').env, undefined);
   assert.equal(buildInvocation('antigravity', 'P', { model: 'M' }).env, undefined);
+});
+
+// --- stream-json flags: claude/glm stream, codex/antigravity don't ---
+
+const STREAM = ['--output-format', 'stream-json', '--verbose', '--include-partial-messages'];
+
+test('claude: stream flags present and stream marker true', () => {
+  const inv = buildInvocation('claude', 'PROMPT', {});
+  assert.equal(inv.stream, true);
+  for (const f of STREAM) assert.ok(inv.args.includes(f), `missing ${f}`);
+  assert.ok(inv.args.includes('-p'));
+});
+
+test('glm: stream flags present and stream marker true; model kept', () => {
+  const inv = buildInvocation('glm', 'PROMPT', { apiKey: 'K' });
+  assert.equal(inv.stream, true);
+  for (const f of STREAM) assert.ok(inv.args.includes(f), `missing ${f}`);
+  assert.deepEqual(inv.args.slice(0, 3), ['-p', '--model', 'glm-5.2']);
+});
+
+test('codex: NOT a stream engine, no stream flags', () => {
+  const inv = buildInvocation('codex', 'PROMPT');
+  assert.equal(inv.stream, false);
+  assert.ok(!inv.args.includes('stream-json'));
+});
+
+test('antigravity: NOT a stream engine', () => {
+  const inv = buildInvocation('antigravity', 'PROMPT', { model: 'M' });
+  assert.equal(inv.stream, false);
 });
