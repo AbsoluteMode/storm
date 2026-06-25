@@ -72,12 +72,15 @@ async function main() {
   const messages = [{ role: 'user', content: prompt }];
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
+    // On the final turn, drop the tools so the model MUST answer instead of looping
+    // on more tool calls — guarantees a non-empty result even if it kept exploring.
+    const offerTools = turn < MAX_TURNS - 1;
     let data;
     try {
       const res = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildAgenticBody(model, messages, reasoningEffort, TOOLS)),
+        body: JSON.stringify(buildAgenticBody(model, messages, reasoningEffort, offerTools ? TOOLS : undefined)),
       });
       data = await res.json();
     } catch (e) {
@@ -91,7 +94,11 @@ async function main() {
     const msg = data.choices?.[0]?.message;
     if (!msg) { process.stderr.write('openrouter: no message in response\n'); process.exit(1); }
 
-    if (msg.tool_calls && msg.tool_calls.length) {
+    if (offerTools && msg.tool_calls && msg.tool_calls.length) {
+      if (turn === MAX_TURNS - 2) {
+        // one tool round left before the forced-answer turn — nudge it to wrap up
+        process.stderr.write('openrouter: tool budget almost spent; final answer next\n');
+      }
       messages.push(msg); // assistant turn carrying the tool calls
       for (const tc of msg.tool_calls) {
         process.stderr.write(`→ ${tc.function?.name}(${tc.function?.arguments})\n`); // progress
@@ -103,11 +110,6 @@ async function main() {
     process.stdout.write(msg.content ?? '');
     process.exit(0);
   }
-
-  process.stderr.write(`openrouter: max tool turns (${MAX_TURNS}) reached\n`);
-  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant' && typeof m.content === 'string');
-  process.stdout.write(lastAssistant?.content ?? '');
-  process.exit(0);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();

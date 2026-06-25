@@ -4,7 +4,19 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { resolveInSandbox, executeTool, TOOLS } from '../scripts/lib/openrouter-tools.mjs';
+import { resolveInSandbox, executeTool, TOOLS, isBlocked } from '../scripts/lib/openrouter-tools.mjs';
+
+test('isBlocked: catches Windows backslash paths too (cross-platform sandbox)', () => {
+  // forward-slash (works on macOS/Linux)
+  assert.ok(isBlocked('.git/config', '.git/config'));
+  assert.ok(isBlocked('sub/.env', 'sub/.env'));
+  // backslash (Windows) — must also be blocked
+  assert.ok(isBlocked('.git\\config', '.git\\config'), '.git\\config must be blocked');
+  assert.ok(isBlocked('sub\\.env', 'sub\\.env'), 'nested .env via backslash must be blocked');
+  assert.ok(isBlocked('a\\.storm-secrets.json', 'a\\.storm-secrets.json'));
+  // a normal source file is NOT blocked
+  assert.ok(!isBlocked('scripts/lib/run-engine.mjs', 'scripts/lib/run-engine.mjs'));
+});
 
 function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), 'storm-sb-'));

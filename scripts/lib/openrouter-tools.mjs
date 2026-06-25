@@ -19,8 +19,13 @@ const MAX_FILE = 200_000;     // cap a single file read
 const MAX_GREP_FILES = 400;   // cap files scanned by grep
 const MAX_GREP_HITS = 100;    // cap reported matches
 
-function isBlocked(rel, raw) {
-  return BLOCKED.some((re) => re.test(rel) || re.test(String(raw)));
+// Normalize Windows backslashes to forward slashes before matching — otherwise the
+// blocklist (Unix-slash regexes) is bypassed on Windows for nested paths like
+// `.git\config` or `subdir\.env`. (Found by the agentic Gemini engine auditing this
+// very file.)
+export function isBlocked(rel, raw) {
+  const norm = (s) => String(s).replace(/\\/g, '/');
+  return BLOCKED.some((re) => re.test(norm(rel)) || re.test(norm(raw)));
 }
 
 // Resolve relPath under cwd. Throws if it escapes cwd or hits the blocklist.
