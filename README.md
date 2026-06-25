@@ -32,10 +32,10 @@ Frontier models in a blind comparison beat any single one of them. Storm is a sm
         (consensus / disagreements / unique findings)
 ```
 
-- **On your own accounts.** Each engine is a headless subprocess. Claude and Codex use their logged-in CLI sessions; GLM and Gemini use your keys. GLM runs through the Claude harness pointed at z.ai (isolated config dir, so your own Claude Code stays on Anthropic); Gemini runs through a tiny OpenRouter wrapper.
+- **On your own accounts.** Each engine is a headless subprocess. Claude and Codex use their logged-in CLI sessions; GLM and Gemini use your keys. GLM runs through the Claude harness pointed at z.ai (isolated config dir, so your own Claude Code stays on Anthropic); Gemini runs through an **agentic** OpenRouter wrapper that can read repo files via sandboxed `read_file`/`list_dir`/`grep` tools (confined to the working directory; secrets and `.git` blocked).
 - **Context-protected.** The orchestrator never sees raw engine chatter — only the `<STORM_RESULT>` block each engine emits. A misbehaving engine can't bloat your context.
 - **Resilient.** A failed, stalled, or auth-blocked engine degrades gracefully; the council synthesizes from whoever answered.
-- **Live heartbeat.** Engines are silent while reasoning. Storm reads their event/reasoning stream (Claude/GLM via `stream-json`, Gemini via SSE reasoning deltas) as a liveness signal, so a working-but-silent engine is never killed mid-thought.
+- **No wall-clock kills.** Engines do deep work and may run for minutes; silence isn't death. Liveness = the process staying alive (the OS reports exit). Timeouts are opt-in (off by default); the one time-based guard is an auth-prompt grace timer. WHY: [`docs/decisions/2026-06-25-no-timeouts-liveness.md`](docs/decisions/2026-06-25-no-timeouts-liveness.md).
 
 ## Requirements
 
@@ -106,7 +106,8 @@ Plain Node ESM, **zero runtime dependencies**, tested with `node --test`.
   - `adapters.mjs` — per-engine invocation (cmd, args, env, stream flag)
   - `fan-out.mjs` — parallel runner, `Promise.allSettled` with per-engine isolation
   - `run-engine.mjs` — spawn + NDJSON accumulator + inactivity/auth/timeout watchdogs
-  - `openrouter-runner.mjs` — HTTP wrapper engine (Gemini via OpenRouter SSE; reasoning → heartbeat)
+  - `openrouter-runner.mjs` — agentic wrapper engine (Gemini via OpenRouter); multi-turn tool loop
+  - `openrouter-tools.mjs` — sandboxed read-only file tools (`read_file`/`list_dir`/`grep`, confined to cwd, secrets/.git blocked)
   - `result-parser.mjs` — extract the last complete `<STORM_RESULT>` block; salvage partials
   - `auth-detect.mjs` — recognize CLI auth prompts (with a grace window for noisy engines)
   - `secrets.mjs` — load local keys, inject into the matching engine
