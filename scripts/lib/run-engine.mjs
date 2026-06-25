@@ -7,13 +7,16 @@ import { detectAuthPrompt } from './auth-detect.mjs';
 const MIN_SALVAGE_LENGTH = 40;
 const AUTH_SCAN_TAIL = 1000; // scan only the recent tail for auth prompts (cheap, catches splits)
 
-export function runInvocation({ engine, cmd, args, input, env }, opts = {}) {
+export function runInvocation({ engine, cmd, args, input, env, stream }, opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 300000; // far backstop, not the primary trigger
   const stallMs = opts.stallMs ?? 90000;      // inactivity (primary trigger)
   const authGraceMs = opts.authGraceMs ?? 30000; // wait after an auth prompt before declaring auth_required (a live engine that merely echoes auth words keeps streaming)
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
+    let jsonBuf = '';      // unparsed NDJSON tail (stream engines only)
+    let finalText = '';    // text from the {type:result} event
+    const deltas = [];     // text_delta chunks (fallback when no result event)
     let settled = false;
     let lastActivity = Date.now();
     let backstopTimer;
@@ -66,6 +69,27 @@ export function runInvocation({ engine, cmd, args, input, env }, opts = {}) {
         finish({ engine, status: 'auth_required', error: 'auth prompt detected; engine went silent after it' });
       }, authGraceMs);
     };
+    // Parse complete NDJSON lines from jsonBuf. Tolerant: never throws on a bad
+    // line. Captures the final answer (result event) and text deltas (fallback).
+    const consumeStream = () => {
+      let nl;
+      while ((nl = jsonBuf.indexOf('\n')) >= 0) {
+        const line = jsonBuf.slice(0, nl);
+        jsonBuf = jsonBuf.slice(nl + 1);
+        if (!line.trim()) continue;
+        let ev;
+        try { ev = JSON.parse(line); } catch { continue; }
+        if (ev.type === 'result' && typeof ev.result === 'string') {
+          finalText = ev.result;
+        } else if (
+          ev.type === 'content_block_delta' &&
+          ev.delta && ev.delta.type === 'text_delta' &&
+          typeof ev.delta.text === 'string'
+        ) {
+          deltas.push(ev.delta.text);
+        }
+      }
+    };
     const onActivity = () => {
       lastActivity = Date.now();
       armStall(); // reset inactivity timer on any output
@@ -76,11 +100,18 @@ export function runInvocation({ engine, cmd, args, input, env }, opts = {}) {
         clearTimeout(authTimer); // auth text scrolled out of the tail -> engine moved on
       }
     };
-    child.stdout.on('data', (d) => { stdout += d; onActivity(); });
+    child.stdout.on('data', (d) => {
+      stdout += d;
+      if (stream) { jsonBuf += d; consumeStream(); }
+      onActivity();
+    });
     child.stderr.on('data', (d) => { stderr += d; onActivity(); });
     child.on('error', (e) => finish({ engine, status: 'error', error: e.message }));
     child.on('close', () => {
-      const parsed = extractResult(stdout);
+      // Stream engines: the answer lives in the assembled final text (result event),
+      // not raw NDJSON stdout (where markers are split across token-deltas).
+      const sourceText = stream ? (finalText || deltas.join('') || stdout) : stdout;
+      const parsed = extractResult(sourceText);
       if (parsed.ok) {
         finish({ engine, status: 'ok', result: parsed.result });
       } else {
@@ -88,7 +119,7 @@ export function runInvocation({ engine, cmd, args, input, env }, opts = {}) {
         // recover the tail rather than discarding the engine's work entirely.
         // Only salvage on no_marker (not unterminated/empty_result — those had markers).
         if (parsed.reason === 'no_marker') {
-          const salvaged = salvageTail(stdout);
+          const salvaged = salvageTail(sourceText);
           if (salvaged.length >= MIN_SALVAGE_LENGTH) {
             finish({ engine, status: 'salvaged', result: salvaged, error: 'no_marker (salvaged)' });
             return;
@@ -134,5 +165,5 @@ export function runEngine(engineId, prompt, cfg = {}, opts = {}) {
   } catch (e) {
     return Promise.resolve({ engine: engineId, status: 'error', error: e.message });
   }
-  return runInvocation({ engine: engineId, cmd: inv.cmd, args: inv.args, input: inv.input, env: inv.env }, opts);
+  return runInvocation({ engine: engineId, cmd: inv.cmd, args: inv.args, input: inv.input, env: inv.env, stream: inv.stream }, opts);
 }

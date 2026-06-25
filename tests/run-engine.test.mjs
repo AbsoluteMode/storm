@@ -9,6 +9,8 @@ const FAKE = fileURLToPath(new URL('./fixtures/fake-engine.mjs', import.meta.url
 const inv = (mode) => ({ engine: 'fake', cmd: process.execPath, args: [FAKE, mode] });
 // inv for stdin-mode: no mode arg — fake-engine reads stdin when no mode arg
 const invStdin = (input) => ({ engine: 'fake', cmd: process.execPath, args: [FAKE, 'stdin'], input });
+// stream-mode invocation helper: marks the invocation as a stream engine
+const invStream = (mode) => ({ engine: 'fake', cmd: process.execPath, args: [FAKE, mode], stream: true });
 
 test('ok mode -> status ok with parsed result, raw chatter dropped', async () => {
   const r = await runInvocation(inv('ok'), { timeoutMs: 5000 });
@@ -150,4 +152,37 @@ test('no env field: child still inherits parent env (PATH present), custom var u
   );
   assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
   assert.equal(r.result, 'UNSET|PATH_PRESENT');
+});
+
+// --- stream-json (NDJSON) engines: claude/glm liveness + final-text extraction ---
+
+test('stream-json: result extracted from the {type:result} event', async () => {
+  const r = await runInvocation(invStream('stream-json'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
+  assert.equal(r.result, '- streamed finding');
+});
+
+test('stream-json: per-event heartbeat keeps it alive under a small stallMs', async () => {
+  // 5 events x 30ms gaps = ~150ms total > stallMs(100), but each event re-arms
+  // the stall timer, so it must NOT be killed.
+  const r = await runInvocation(invStream('stream-json'), { stallMs: 100, timeoutMs: 8000 });
+  assert.equal(r.status, 'ok', `expected ok (heartbeat alive), got ${r.status}`);
+});
+
+test('stream-json-garbage: malformed line is skipped, result still extracted', async () => {
+  const r = await runInvocation(invStream('stream-json-garbage'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
+  assert.equal(r.result, '- survived garbage');
+});
+
+test('stream-json-nofinal: falls back to assembling text_delta chunks', async () => {
+  const r = await runInvocation(invStream('stream-json-nofinal'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.ok(['ok', 'salvaged'].includes(r.status), `expected ok/salvaged, got ${r.status}`);
+  assert.ok(r.result.includes('assembled from deltas'), `got: ${r.result}`);
+});
+
+test('non-stream engine still uses the raw-stdout path (regression)', async () => {
+  const r = await runInvocation(inv('ok'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.status, 'ok');
+  assert.equal(r.result, '- ok finding');
 });

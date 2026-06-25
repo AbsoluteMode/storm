@@ -72,6 +72,50 @@ else if (mode === 'echo-env') {
   process.stdout.write(`<STORM_RESULT>\n${v}|${path}\n</STORM_RESULT>\n`);
   process.exit(0);
 }
+// stream-json: emit NDJSON events with gaps (heartbeat), then a final result
+// event carrying the STORM_RESULT markers. Simulates claude/glm under
+// --output-format stream-json. The 30ms gaps exercise stall re-arming.
+else if (mode === 'stream-json') {
+  const events = [
+    { type: 'system', subtype: 'init' },
+    { type: 'content_block_delta', delta: { type: 'thinking_delta', thinking: 'reasoning...' } },
+    { type: 'content_block_delta', delta: { type: 'text_delta', text: '<STORM_' } },
+    { type: 'content_block_delta', delta: { type: 'text_delta', text: 'RESULT>\n- streamed\n</STORM_RESULT>' } },
+    { type: 'result', subtype: 'success', result: '<STORM_RESULT>\n- streamed finding\n</STORM_RESULT>' },
+  ];
+  let i = 0;
+  const iv = setInterval(() => {
+    process.stdout.write(JSON.stringify(events[i]) + '\n');
+    if (++i >= events.length) { clearInterval(iv); process.exit(0); }
+  }, 30);
+}
+// stream-json-nofinal: text_delta events but NO result event -> exercises the
+// delta-assembly fallback. Markers split across two deltas.
+else if (mode === 'stream-json-nofinal') {
+  const events = [
+    { type: 'content_block_delta', delta: { type: 'text_delta', text: '<STORM_RESULT>\n- assembled' } },
+    { type: 'content_block_delta', delta: { type: 'text_delta', text: ' from deltas\n</STORM_RESULT>' } },
+  ];
+  let i = 0;
+  const iv = setInterval(() => {
+    process.stdout.write(JSON.stringify(events[i]) + '\n');
+    if (++i >= events.length) { clearInterval(iv); process.exit(0); }
+  }, 20);
+}
+// stream-json-garbage: a malformed line between valid events -> parser must skip
+// it (tolerant) and still extract the result.
+else if (mode === 'stream-json-garbage') {
+  const lines = [
+    JSON.stringify({ type: 'system', subtype: 'init' }),
+    '{ this is not valid json',
+    JSON.stringify({ type: 'result', subtype: 'success', result: '<STORM_RESULT>\n- survived garbage\n</STORM_RESULT>' }),
+  ];
+  let i = 0;
+  const iv = setInterval(() => {
+    process.stdout.write(lines[i] + '\n');
+    if (++i >= lines.length) { clearInterval(iv); process.exit(0); }
+  }, 20);
+}
 // slow-stream: emit a heartbeat chunk every 40ms for ~2s, then a valid result.
 // Frequent chunks (40ms) vs the test's stallMs (1000ms) give a ~25x margin so
 // the "heartbeat resets stall" test stays green even under machine load.
