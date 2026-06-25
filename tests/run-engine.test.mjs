@@ -186,3 +186,16 @@ test('non-stream engine still uses the raw-stdout path (regression)', async () =
   assert.equal(r.status, 'ok');
   assert.equal(r.result, '- ok finding');
 });
+
+// review findings: final-line flush + empty-result semantics
+
+test('stream-json-no-newline: final result line without trailing newline is still extracted', async () => {
+  const r = await runInvocation(invStream('stream-json-no-newline'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
+  assert.equal(r.result, '- no newline finding');
+});
+
+test('stream-json-empty-result: empty result event -> no_result, not salvaged garbage', async () => {
+  const r = await runInvocation(invStream('stream-json-empty-result'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.status, 'no_result', `expected no_result, got ${r.status}: ${r.result ?? r.error}`);
+});

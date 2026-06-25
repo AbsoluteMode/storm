@@ -116,6 +116,23 @@ else if (mode === 'stream-json-garbage') {
     if (++i >= lines.length) { clearInterval(iv); process.exit(0); }
   }, 20);
 }
+// stream-json-no-newline: final result event WITHOUT a trailing newline ->
+// exercises the close() flush (the line would otherwise stay stuck in jsonBuf).
+else if (mode === 'stream-json-no-newline') {
+  process.stdout.write(JSON.stringify({ type: 'system', subtype: 'init' }) + '\n');
+  process.stdout.write(
+    JSON.stringify({ type: 'result', subtype: 'success', result: '<STORM_RESULT>\n- no newline finding\n</STORM_RESULT>' }),
+    () => process.exit(0),
+  );
+}
+// stream-json-empty-result: result event with an empty string -> must yield
+// no_result, NOT a salvage of the raw NDJSON envelope.
+else if (mode === 'stream-json-empty-result') {
+  process.stdout.write(
+    JSON.stringify({ type: 'result', subtype: 'success', result: '' }) + '\n',
+    () => process.exit(0),
+  );
+}
 // slow-stream: emit a heartbeat chunk every 40ms for ~2s, then a valid result.
 // Frequent chunks (40ms) vs the test's stallMs (1000ms) give a ~25x margin so
 // the "heartbeat resets stall" test stays green even under machine load.

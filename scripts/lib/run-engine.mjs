@@ -15,7 +15,7 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
     let stdout = '';
     let stderr = '';
     let jsonBuf = '';      // unparsed NDJSON tail (stream engines only)
-    let finalText = '';    // text from the {type:result} event
+    let finalText = null;  // null = no result event seen yet; '' = an empty result event
     const deltas = [];     // text_delta chunks (fallback when no result event)
     let settled = false;
     let lastActivity = Date.now();
@@ -108,9 +108,12 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
     child.stderr.on('data', (d) => { stderr += d; onActivity(); });
     child.on('error', (e) => finish({ engine, status: 'error', error: e.message }));
     child.on('close', () => {
+      // Flush a final NDJSON line that arrived without a trailing newline.
+      if (stream && jsonBuf.trim()) { jsonBuf += '\n'; consumeStream(); }
       // Stream engines: the answer lives in the assembled final text (result event),
-      // not raw NDJSON stdout (where markers are split across token-deltas).
-      const sourceText = stream ? (finalText || deltas.join('') || stdout) : stdout;
+      // not raw NDJSON stdout (where markers are split across token-deltas). Use ?? so
+      // an empty-string result event is honored, not treated as "no result seen".
+      const sourceText = stream ? (finalText ?? (deltas.length ? deltas.join('') : stdout)) : stdout;
       const parsed = extractResult(sourceText);
       if (parsed.ok) {
         finish({ engine, status: 'ok', result: parsed.result });
