@@ -1,6 +1,6 @@
 {
   "name": "storm",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "private": true,
   "description": "Storm — multi-engine council for Claude Code (plan mode)",

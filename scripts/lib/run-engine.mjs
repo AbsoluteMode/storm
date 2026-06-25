@@ -10,6 +10,7 @@ const AUTH_SCAN_TAIL = 1000; // scan only the recent tail for auth prompts (chea
 export function runInvocation({ engine, cmd, args, input, env }, opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 300000; // far backstop, not the primary trigger
   const stallMs = opts.stallMs ?? 90000;      // inactivity (primary trigger)
+  const authGraceMs = opts.authGraceMs ?? 30000; // wait after an auth prompt before declaring auth_required (a live engine that merely echoes auth words keeps streaming)
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
@@ -17,7 +18,8 @@ export function runInvocation({ engine, cmd, args, input, env }, opts = {}) {
     let lastActivity = Date.now();
     let backstopTimer;
     let stallTimer;
-    const clearTimers = () => { clearTimeout(backstopTimer); clearTimeout(stallTimer); };
+    let authTimer;
+    const clearTimers = () => { clearTimeout(backstopTimer); clearTimeout(stallTimer); clearTimeout(authTimer); };
     const finish = (res) => {
       if (settled) return;
       settled = true;
@@ -53,13 +55,25 @@ export function runInvocation({ engine, cmd, args, input, env }, opts = {}) {
     }, timeoutMs);
     armStall();
 
+    // Arm/re-arm a short grace timer when an auth prompt is seen. It fires only if
+    // the engine then goes SILENT (a real auth hang = prompt + waiting for input).
+    // A live engine that merely echoes auth vocabulary (codex) keeps streaming, so
+    // the timer keeps resetting / the phrase scrolls out of the tail -> no false kill.
+    const armAuthGrace = () => {
+      clearTimeout(authTimer);
+      authTimer = setTimeout(() => {
+        child.kill('SIGKILL');
+        finish({ engine, status: 'auth_required', error: 'auth prompt detected; engine went silent after it' });
+      }, authGraceMs);
+    };
     const onActivity = () => {
       lastActivity = Date.now();
       armStall(); // reset inactivity timer on any output
       const tail = (stdout.slice(-AUTH_SCAN_TAIL)) + '\n' + (stderr.slice(-AUTH_SCAN_TAIL));
       if (detectAuthPrompt(tail)) {
-        child.kill('SIGKILL');
-        finish({ engine, status: 'auth_required', error: 'authentication prompt detected' });
+        armAuthGrace();
+      } else {
+        clearTimeout(authTimer); // auth text scrolled out of the tail -> engine moved on
       }
     };
     child.stdout.on('data', (d) => { stdout += d; onActivity(); });

@@ -103,9 +103,18 @@ test('silent-hang -> stalled (no output past stallMs)', async () => {
   assert.ok(typeof r.lastActivityMs === 'number');
 });
 
-test('auth-prompt -> auth_required quickly', async () => {
-  const r = await runInvocation(inv('auth-prompt'), { stallMs: 5000, timeoutMs: 8000 });
+test('auth-prompt then silence -> auth_required after grace', async () => {
+  const r = await runInvocation(inv('auth-prompt'), { authGraceMs: 300, stallMs: 5000, timeoutMs: 8000 });
   assert.equal(r.status, 'auth_required');
+});
+
+test('auth phrase but engine keeps streaming -> NOT killed, finishes ok', async () => {
+  // codex-flaky scenario: an auth-looking line appears, but the engine is alive
+  // and keeps producing output. The grace timer must keep resetting / the phrase
+  // scrolls out of the scan tail -> no false auth_required.
+  const r = await runInvocation(inv('auth-then-work'), { authGraceMs: 300, stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.status, 'ok', `expected ok (engine stayed alive), got ${r.status}: ${r.error}`);
+  assert.equal(r.result, '- done despite the auth noise');
 });
 
 test('slow-stream is NOT stalled (heartbeat resets inactivity)', async () => {

@@ -41,10 +41,27 @@ if (mode === 'ok') {
 else if (mode === 'silent-hang') {
   setInterval(() => {}, 1000); // keep process alive, emit nothing
 }
-// auth-prompt: emit a CLI auth-failure line, then keep quiet
+// auth-prompt: emit a CLI auth-failure line, then keep quiet (a REAL auth hang:
+// prompt + silence waiting for input). The grace timer should fire -> auth_required.
 else if (mode === 'auth-prompt') {
   process.stdout.write('You are not logged in. Run `claude login` to continue.\n');
   setInterval(() => {}, 1000);
+}
+// auth-then-work: emit an auth-looking line, then KEEP streaming and finish ok.
+// Simulates codex echoing auth vocabulary while genuinely alive — must NOT be
+// killed. Each chunk is long enough that ~30 of them push the auth phrase out of
+// the 1000-char scan tail, proving liveness both ways (re-arm + tail eviction).
+else if (mode === 'auth-then-work') {
+  process.stdout.write('Authentication required for this provider.\n');
+  let n = 0;
+  const iv = setInterval(() => {
+    process.stdout.write(`. still working ${n} with plenty of fresh output to push the auth line out of the scan tail and prove the engine is alive\n`);
+    if (++n >= 30) {
+      clearInterval(iv);
+      process.stdout.write('<STORM_RESULT>\n- done despite the auth noise\n</STORM_RESULT>\n');
+      process.exit(0);
+    }
+  }, 20);
 }
 // echo-env: echo a custom env var + whether PATH was inherited. Lets tests assert
 // that per-engine env is MERGED into the child (custom var delivered) rather than
