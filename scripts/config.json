@@ -1,7 +1,7 @@
 {
   "role": "reviewer",
-  "timeoutMs": 480000,
-  "stallMs": 60000,
+  "timeoutMs": null,
+  "stallMs": null,
   "engines": [
     { "id": "claude", "model": null },
     { "id": "codex" },

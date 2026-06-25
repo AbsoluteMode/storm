@@ -8,8 +8,16 @@ const MIN_SALVAGE_LENGTH = 40;
 const AUTH_SCAN_TAIL = 1000; // scan only the recent tail for auth prompts (cheap, catches splits)
 
 export function runInvocation({ engine, cmd, args, input, env, stream }, opts = {}) {
-  const timeoutMs = opts.timeoutMs ?? 300000; // far backstop, not the primary trigger
-  const stallMs = opts.stallMs ?? 90000;      // inactivity (primary trigger)
+  // Timeouts are OPT-IN: a positive number arms the timer; null/0 disables it.
+  // Storm's default policy is NO wall-clock kill — engines (codex under xhigh, deep
+  // agentic runs) can legitimately work for many minutes to hours, silent while
+  // reasoning. Silence != death. Liveness is instead the process staying alive
+  // (close/error are the terminal signals) plus output growth (diagnostics). The
+  // one kept guard is the auth-prompt grace timer below, which catches a real
+  // input-wait hang (engine asked for auth, stdin is closed -> waits forever).
+  // WHY: docs/decisions/2026-06-25-no-timeouts-liveness.md
+  const timeoutMs = opts.timeoutMs === undefined ? 300000 : opts.timeoutMs; // null/0 => disabled
+  const stallMs = opts.stallMs === undefined ? 90000 : opts.stallMs;        // null/0 => disabled
   const authGraceMs = opts.authGraceMs ?? 30000; // wait after an auth prompt before declaring auth_required (a live engine that merely echoes auth words keeps streaming)
   return new Promise((resolve) => {
     let stdout = '';
@@ -44,18 +52,23 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
 
+    const stallEnabled = Number.isFinite(stallMs) && stallMs > 0;
     const armStall = () => {
+      if (!stallEnabled) return; // disabled: a silent-but-alive engine is presumed working
       clearTimeout(stallTimer);
       stallTimer = setTimeout(() => {
         child.kill('SIGKILL');
         finish({ engine, status: 'stalled', error: `no output for ${stallMs}ms` });
       }, stallMs);
     };
+    // Backstop wall-clock kill — only when explicitly enabled (positive timeoutMs).
     // v1: kills the direct child only; grandchildren spawned by the engine CLI may orphan on timeout.
-    backstopTimer = setTimeout(() => {
-      child.kill('SIGKILL');
-      finish({ engine, status: 'timeout', error: `timeout after ${timeoutMs}ms` });
-    }, timeoutMs);
+    if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+      backstopTimer = setTimeout(() => {
+        child.kill('SIGKILL');
+        finish({ engine, status: 'timeout', error: `timeout after ${timeoutMs}ms` });
+      }, timeoutMs);
+    }
     armStall();
 
     // Arm/re-arm a short grace timer when an auth prompt is seen. It fires only if

@@ -36,6 +36,14 @@ if (mode === 'ok') {
   // Produces trivial/short output without markers — too short to salvage.
   process.stdout.write('ok\n');
   process.exit(0);
+} else if (mode === 'quiet-then-ok') {
+  // Stay SILENT past a small stallMs, then emit a valid result and exit. Proves a
+  // disabled stall (stallMs null/0) does NOT kill a quietly-working engine, while
+  // a tiny ENABLED stallMs WOULD (contrast test).
+  setTimeout(() => {
+    process.stdout.write('<STORM_RESULT>\n- quietly finished\n</STORM_RESULT>\n');
+    process.exit(0);
+  }, 250);
 }
 // silent-hang: produce NO output and never exit on its own (until killed)
 else if (mode === 'silent-hang') {

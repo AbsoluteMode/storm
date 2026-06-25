@@ -199,3 +199,25 @@ test('stream-json-empty-result: empty result event -> no_result, not salvaged ga
   const r = await runInvocation(invStream('stream-json-empty-result'), { stallMs: 5000, timeoutMs: 8000 });
   assert.equal(r.status, 'no_result', `expected no_result, got ${r.status}: ${r.result ?? r.error}`);
 });
+
+// --- no-timeout policy: disabled stall/backstop must not kill a working engine ---
+
+test('stall DISABLED (stallMs null) -> a quietly-working engine is NOT stalled, finishes ok', async () => {
+  // Storm's default policy: no wall-clock kill. A silent-but-alive engine (deep
+  // reasoning) must run to completion when the timers are off.
+  const r = await runInvocation(inv('quiet-then-ok'), { stallMs: null, timeoutMs: null });
+  assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
+  assert.equal(r.result, '- quietly finished');
+});
+
+test('contrast: the SAME engine WOULD stall under a tiny enabled stallMs (proves disabling is what saves it)', async () => {
+  const r = await runInvocation(inv('quiet-then-ok'), { stallMs: 80, timeoutMs: 5000 });
+  assert.equal(r.status, 'stalled');
+});
+
+test('auth-grace still fires with stall+timeout disabled (the one kept liveness guard)', async () => {
+  // Even with no wall-clock timers, a real input-wait hang (auth prompt + silence,
+  // stdin closed) must still be caught — otherwise the council would hang forever.
+  const r = await runInvocation(inv('auth-prompt'), { stallMs: null, timeoutMs: null, authGraceMs: 300 });
+  assert.equal(r.status, 'auth_required');
+});
