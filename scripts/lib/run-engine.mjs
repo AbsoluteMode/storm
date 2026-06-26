@@ -43,6 +43,7 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
       // Claude Code backend to z.ai this way). undefined env => inherit unchanged.
       child = spawn(cmd, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: opts.cwd, // undefined => Node inherits the parent working directory (default)
         env: env ? { ...process.env, ...env } : process.env,
       });
     } catch (e) {

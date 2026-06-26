@@ -3,6 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runInvocation, runEngine } from '../scripts/lib/run-engine.mjs';
+import { mkdtempSync, realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const FAKE = fileURLToPath(new URL('./fixtures/fake-engine.mjs', import.meta.url));
 // inv for modes that need no input (args-driven)
@@ -220,4 +223,25 @@ test('auth-grace still fires with stall+timeout disabled (the one kept liveness 
   // stdin closed) must still be caught — otherwise the council would hang forever.
   const r = await runInvocation(inv('auth-prompt'), { stallMs: null, timeoutMs: null, authGraceMs: 300 });
   assert.equal(r.status, 'auth_required');
+});
+
+// --- cwd: the council's target directory reaches the child via spawn ---
+
+test('cwd opt is passed to spawn: child process.cwd() == the given dir', async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'storm-cwd-')));
+  const r = await runInvocation(
+    { engine: 'fake', cmd: process.execPath, args: [FAKE, 'cwd'] },
+    { cwd: dir, timeoutMs: 5000 },
+  );
+  assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
+  assert.equal(r.result, dir);
+});
+
+test('no cwd opt -> child inherits the parent working directory (regression)', async () => {
+  const r = await runInvocation(
+    { engine: 'fake', cmd: process.execPath, args: [FAKE, 'cwd'] },
+    { timeoutMs: 5000 },
+  );
+  assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
+  assert.equal(r.result, realpathSync(process.cwd()));
 });

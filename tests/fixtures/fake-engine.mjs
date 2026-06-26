@@ -80,6 +80,12 @@ else if (mode === 'echo-env') {
   process.stdout.write(`<STORM_RESULT>\n${v}|${path}\n</STORM_RESULT>\n`);
   process.exit(0);
 }
+// cwd: print our own working directory inside the markers, so a test can assert
+// run-engine passed `cwd` to spawn (the child inherits it). process.cwd() is the realpath.
+else if (mode === 'cwd') {
+  process.stdout.write(`<STORM_RESULT>\n${process.cwd()}\n</STORM_RESULT>\n`);
+  process.exit(0);
+}
 // stream-json: emit NDJSON events with gaps (heartbeat), then a final result
 // event carrying the STORM_RESULT markers. Simulates claude/glm under
 // --output-format stream-json. The 30ms gaps exercise stall re-arming.
