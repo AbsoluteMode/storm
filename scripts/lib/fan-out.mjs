@@ -5,11 +5,11 @@ import { buildStormPrompt } from './prompt.mjs';
 export async function runAll(task, engines, opts = {}) {
   const runner = opts.runner ?? runEngine;
   const role = opts.role ?? 'reviewer';
-  const prompt = buildStormPrompt({ task, role, repoPath: opts.repoPath });
+  const prompt = buildStormPrompt({ task, role, repoPath: opts.cwd });
   const settled = await Promise.allSettled(
     engines.map((e) => {
       try {
-        return runner(e.id, prompt, e, { timeoutMs: opts.timeoutMs, stallMs: opts.stallMs });
+        return runner(e.id, prompt, e, { timeoutMs: opts.timeoutMs, stallMs: opts.stallMs, cwd: opts.cwd });
       } catch (err) {
         return Promise.reject(err);
       }

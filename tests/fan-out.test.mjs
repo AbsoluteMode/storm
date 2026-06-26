@@ -46,3 +46,13 @@ test('synchronously-throwing runner is caught by allSettled defense; other engin
   assert.ok(bad.error.includes('sync boom'));
   assert.equal(good.status, 'ok');
 });
+
+test('cwd from opts is threaded into each runner call and into the prompt', async () => {
+  const seen = [];
+  const runner = (id, _prompt, _cfg, opts) => {
+    seen.push(opts.cwd);
+    return Promise.resolve({ engine: id, status: 'ok', result: 'r' });
+  };
+  await runAll('task', [{ id: 'claude' }, { id: 'codex' }], { runner, cwd: '/target/repo' });
+  assert.deepEqual(seen, ['/target/repo', '/target/repo']);
+});
