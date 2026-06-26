@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 // existing directory. Fail-fast: a missing value / bad path throws rather than
 // silently falling back to process.cwd() (which would audit the wrong repo).
 // Absent --cwd => cwd = deps.cwd() (default process.cwd()).
+// WHY: docs/decisions/2026-06-26-target-cwd.md
 export function parseStormArgs(argv, deps = {}) {
   const stat = deps.statSync ?? statSync;
   const getCwd = deps.cwd ?? (() => process.cwd());

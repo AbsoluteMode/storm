@@ -43,7 +43,7 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
       // Claude Code backend to z.ai this way). undefined env => inherit unchanged.
       child = spawn(cmd, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: opts.cwd, // undefined => Node inherits the parent working directory (default)
+        cwd: opts.cwd, // undefined => inherit. One point that cascades to all engines + Gemini sandbox. WHY: docs/decisions/2026-06-26-target-cwd.md
         env: env ? { ...process.env, ...env } : process.env,
       });
     } catch (e) {
