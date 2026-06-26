@@ -82,6 +82,17 @@ Storm is read-only (`plan`): review, RCA, analysis, second opinions. Examples:
 /storm plan critique this caching design and rank the failure modes
 ```
 
+By default the council reads the directory you run it from. To audit a *different*
+repo without leaving your session, target it by absolute path:
+
+```
+/storm plan review the auth flow in my other project --cwd /abs/path/to/other-repo
+```
+
+The orchestrator passes `--cwd` to the companion; every engine (and the Gemini
+sandbox) then reads that repo. A non-existent path fails fast — it never silently
+falls back to the current directory.
+
 > `action` mode (parallel implementation in isolated git worktrees + smart merge) is a future phase.
 
 ## Configuration
