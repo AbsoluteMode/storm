@@ -18,7 +18,7 @@ async function main() {
     process.exit(2);
   }
   const cfg = JSON.parse(await readFile(new URL('./config.json', import.meta.url), 'utf8'));
-  // Inject local secrets (z.ai/GLM + OpenRouter keys) into the matching engine; absent file => unchanged.
+  // Inject local secrets (z.ai/GLM + OpenRouter keys + experimentEnv) into engines.
   const engines = injectSecrets(cfg.engines, loadSecrets());
   const results = await runAll(task, engines, {
     role: cfg.role,
@@ -31,8 +31,17 @@ async function main() {
   let out = { mode, task, repoPath: cwd, results };
   if (cfg.proof?.enabled) {
     const { annotateWithProof } = await import('./lib/proof.mjs');
+    // annotateWithProof re-runs free experiments in fresh worktrees of its own;
+    // it does NOT need experimentEnv (its re-runs are local-only, no key required).
     const proofed = await annotateWithProof(results, { repoPath: cwd, timeoutMs: cfg.proof.experimentTimeoutMs });
-    out = { mode, task, repoPath: cwd, results: proofed.results, executed_experiments: proofed.executed_experiments, pending_paid_experiments: proofed.pending_paid_experiments };
+    out = {
+      mode,
+      task,
+      repoPath: cwd,
+      results: proofed.results,
+      verified_experiments: proofed.verified_experiments,
+      engine_claimed_experiments: proofed.engine_claimed_experiments,
+    };
   }
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
 }

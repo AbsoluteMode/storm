@@ -41,10 +41,16 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
     try {
       // Merge per-engine env over the inherited environment (glm redirects the
       // Claude Code backend to z.ai this way). undefined env => inherit unchanged.
+      // Merge order: process.env < inv.env (per-engine backend vars, e.g. GLM redirect)
+      // < opts.env (experiment env from proof mode — test key must win). Undefined opts.env
+      // or inv.env leaves the lower layers unchanged. WHY: task-6 experiment env wiring.
+      const spawnEnv = (env || opts.env)
+        ? { ...process.env, ...(env ?? {}), ...(opts.env ?? {}) }
+        : process.env;
       child = spawn(cmd, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: opts.cwd, // undefined => inherit. One point that cascades to all engines + Gemini sandbox. WHY: docs/decisions/2026-06-26-target-cwd.md
-        env: env ? { ...process.env, ...env } : process.env,
+        env: spawnEnv,
       });
     } catch (e) {
       return finish({ engine, status: 'error', error: e.message });

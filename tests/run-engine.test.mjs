@@ -246,3 +246,18 @@ test('no cwd opt -> child inherits the parent working directory (regression)', a
   assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
   assert.equal(r.result, realpathSync(process.cwd()));
 });
+
+// --- opts.env threading: experiment key must reach the child via opts.env ---
+
+test('opts.env: custom var in opts.env reaches the child, merged over inv.env (opts.env wins)', async () => {
+  // opts.env carries the experimentEnv (test key) in proof mode. It must be merged
+  // into the spawn env so the engine's child receives the key. The spawn env must be
+  // { ...process.env, ...inv.env, ...opts.env } (opts.env wins).
+  // inv.env has STORM_TEST_VAR='from-inv', opts.env overrides to 'from-opts-env'.
+  const r = await runInvocation(
+    { engine: 'fake', cmd: process.execPath, args: [FAKE, 'echo-env'], env: { STORM_TEST_VAR: 'from-inv' } },
+    { timeoutMs: 5000, env: { STORM_TEST_VAR: 'from-opts-env' } },
+  );
+  assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
+  assert.equal(r.result, 'from-opts-env|PATH_PRESENT');
+});
