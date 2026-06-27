@@ -67,6 +67,11 @@ GLM and Gemini need keys. Put them in `.storm-secrets.json` in the plugin root �
 
 - **GLM** — get a key from the [z.ai console](https://z.ai/manage-apikey/apikey-list). It's injected only into the GLM subprocess, which runs with an isolated `CLAUDE_CONFIG_DIR`; your own Claude Code session is untouched and stays on Anthropic.
 - **Gemini** — get a key from [OpenRouter](https://openrouter.ai/keys). Gemini is billed per token (cheap for occasional council runs); Claude/Codex/GLM are flat-rate subscriptions. Either key is optional — omit one and that engine is simply skipped.
+- **Experiment key (optional)** — for [proof mode](#proof-mode), engines may run networked experiments (e.g. comparing models). Add an `experimentEnv` object and it's passed into each engine's worktree env. Use a **test key with a provider-side budget cap** — the engine spends it freely while experimenting:
+
+  ```json
+  { "experimentEnv": { "OPENROUTER_API_KEY": "your-test-key" } }
+  ```
 
 ## Usage
 
@@ -94,6 +99,21 @@ sandbox) then reads that repo. A non-existent path fails fast — it never silen
 falls back to the current directory.
 
 > `action` mode (parallel implementation in isolated git worktrees + smart merge) is a future phase.
+
+## Proof mode
+
+By default (`proof.enabled` in config) each engine doesn't just *claim* a finding — it **proves** it. Every CLI engine runs in its own throwaway **git worktree** with full rights (write, execute, network), reproduces each finding with a real experiment, and attaches it:
+
+```
+[FINDING] <title>
+run: <the exact command it ran>
+expects: <a checkable prediction: exit!=0 | exit==N | stdout contains "X">
+observed: <what happened>
+```
+
+The orchestrator then **re-runs** each locally-reproducible experiment in a fresh clean worktree and sets `proven`/`disproven` itself — an engine can't self-certify a fabricated result (*verify-don't-trust*). Networked experiments (which the engine ran with your `experimentEnv` test key) are accepted as engine-claimed. **Your real repo is never touched** — engines work only in their worktrees, and the orchestrator's re-runs happen in fresh ones.
+
+Set `proof.enabled: false` in `scripts/config.json` to fall back to plain read-only review. WHY: [`docs/decisions/2026-06-27-stage2-self-experiment.md`](docs/decisions/2026-06-27-stage2-self-experiment.md).
 
 ## Configuration
 
@@ -123,6 +143,8 @@ Plain Node ESM, **zero runtime dependencies**, tested with `node --test`.
   - `auth-detect.mjs` — recognize CLI auth prompts (with a grace window for noisy engines)
   - `secrets.mjs` — load local keys, inject into the matching engine
   - `prompt.mjs` — build the council prompt + marker contract
+  - `workspace.mjs` — per-engine git worktree (proof mode): HEAD + uncommitted transfer, cp-fallback, cleanup
+  - `proof.mjs` — proof mode: `[FINDING]` parser + orchestrator verify pass (re-run, `proven`/`disproven`)
 - `commands/storm.md`, `skills/storm-runtime/SKILL.md` — orchestrator contract
 
 Design docs in [`docs/specs/`](docs/specs/); implementation plans in [`docs/plans/`](docs/plans/).

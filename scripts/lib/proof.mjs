@@ -110,10 +110,12 @@ export function runExperiment(run, cwd, { timeoutMs = 30000, env } = {}) {
   });
 }
 
-// Second pass (Stage 1 / back-compat): prove each engine's findings.
-// PROVEN is granted ONLY here, on a matching orchestrator-captured artifact.
-// Paid/unknown experiments are never run (default-deny) — surfaced for the user.
-// WHY: docs/decisions/2026-06-27-proof-required-review.md (verify-don't-trust)
+// Second pass: verify each engine's [FINDING]. PROVEN is granted ONLY here, on a
+// matching orchestrator re-run in a fresh clean worktree (verify-don't-trust).
+// Locally-reproducible findings are re-run; networked ones are accepted as
+// engine-claimed (the test key already let the engine run them itself). A timed-out
+// re-run is never proven.
+// WHY: docs/decisions/2026-06-27-stage2-self-experiment.md (orchestrator verify pass) + 2026-06-27-proof-required-review.md (verify-don't-trust)
 export async function annotateWithProof(results, { repoPath, timeoutMs = 30000 } = {}) {
   const verified_experiments = [];
   const engine_claimed_experiments = [];

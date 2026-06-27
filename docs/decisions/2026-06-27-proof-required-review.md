@@ -2,6 +2,10 @@
 
 - Дата: 2026-06-27
 - Статус: реализовано Stage 1, Storm 0.9.0
+- ЧАСТИЧНО SUPERSEDED Stage 2 (0.10.0, `2026-06-27-stage2-self-experiment.md`):
+  движки теперь self-experiment'ят в worktree; «cost default-deny / предупредить до
+  платного / paid не запускается» ОТМЕНЕНО (тестовый ключ с провайдер-лимитом);
+  throwaway-copy перепрогона заменён на git worktree. Verify-don't-trust остаётся в силе.
 
 ## Контекст
 

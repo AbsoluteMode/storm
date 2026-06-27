@@ -43,7 +43,7 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
       // Claude Code backend to z.ai this way). undefined env => inherit unchanged.
       // Merge order: process.env < inv.env (per-engine backend vars, e.g. GLM redirect)
       // < opts.env (experiment env from proof mode — test key must win). Undefined opts.env
-      // or inv.env leaves the lower layers unchanged. WHY: task-6 experiment env wiring.
+      // or inv.env leaves the lower layers unchanged. WHY: docs/decisions/2026-06-27-stage2-self-experiment.md
       const spawnEnv = (env || opts.env)
         ? { ...process.env, ...(env ?? {}), ...(opts.env ?? {}) }
         : process.env;
