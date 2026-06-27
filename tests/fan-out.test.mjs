@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -108,9 +108,12 @@ test('proof mode: each engine spawns in its own worktree, cleaned up after', asy
     // All worktrees must be distinct.
     assert.notEqual(cwds[0], cwds[1], 'each engine should get its own distinct worktree');
 
-    // Cleanup must have run: no storm-ws-* dirs should remain under tmpdir().
-    const leftover = readdirSync(realTmpdir).filter((n) => n.startsWith('storm-ws-'));
-    assert.equal(leftover.length, 0, `storm-ws-* dirs remain after runAll: ${leftover.join(', ')}`);
+    // Cleanup must have run: THIS run's specific worktree dirs must be gone.
+    // (Scanning tmpdir globally for storm-ws-* is non-isolable — sibling test
+    // files run in parallel under the same tmpdir and create their own.)
+    for (const cwd of cwds) {
+      assert.equal(existsSync(cwd), false, `worktree should be cleaned up after runAll, still exists: ${cwd}`);
+    }
   } finally {
     rmSync(repoPath, { recursive: true, force: true });
   }
