@@ -1,7 +1,7 @@
 // tests/proof.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseProofFindings, classifyCost, predictMatches } from '../scripts/lib/proof.mjs';
+import { parseProofFindings, parseFindings, classifyCost, predictMatches, annotateWithProof } from '../scripts/lib/proof.mjs';
 
 test('parseProofFindings: NEEDS-EXPERIMENT with run/expects/cost sub-grammar', () => {
   const text = [
@@ -99,4 +99,79 @@ test('predictMatches: normal numeric exitCode still works correctly', () => {
   assert.equal(predictMatches('exit!=0', { exitCode: 1 }), true);
   assert.equal(predictMatches('exit!=0', { exitCode: 127 }), true);
   assert.equal(predictMatches('exit!=0', { exitCode: 0 }), false);
+});
+
+// --- parseFindings (new Stage-2 parser) ---
+
+test('parseFindings extracts [FINDING] run/expects/observed', () => {
+  const f = parseFindings('[FINDING] crash on empty\nrun: node -e "process.exit(3)"\nexpects: exit==3\nobserved: exited 3');
+  assert.equal(f[0].tag, 'finding');
+  assert.equal(f[0].run, 'node -e "process.exit(3)"');
+  assert.equal(f[0].expects, 'exit==3');
+});
+
+test('parseFindings: UNPROVEN-CANNOT with inline why is still recognised', () => {
+  const f = parseFindings('[UNPROVEN-CANNOT] Race — why: nondeterministic timing');
+  assert.equal(f[0].tag, 'unproven-cannot');
+  assert.equal(f[0].title, 'Race');
+  assert.equal(f[0].why, 'nondeterministic timing');
+});
+
+test('parseFindings: multiple blocks, tolerant of junk lines', () => {
+  const text = [
+    '[FINDING] First',
+    '  run: true',
+    'garbage',
+    '[UNPROVEN-CANNOT] Second',
+  ].join('\n');
+  const fs = parseFindings(text);
+  assert.equal(fs.length, 2);
+  assert.equal(fs[0].title, 'First');
+  assert.equal(fs[1].tag, 'unproven-cannot');
+});
+
+test('parseFindings: empty / nullish -> []', () => {
+  assert.deepEqual(parseFindings(''), []);
+  assert.deepEqual(parseFindings(null), []);
+});
+
+// --- annotateWithProof (new Stage-2 verify pass) ---
+
+test('locally-reproducible finding is re-verified to proven', async () => {
+  const results = [{ engine: 'codex', status: 'ok',
+    result: '[FINDING] exits 3\nrun: sh -c "exit 3"\nexpects: exit==3\nobserved: 3' }];
+  const out = await annotateWithProof(results, { repoPath: process.cwd(), timeoutMs: 5000 });
+  const f = out.results[0].findings[0];
+  assert.equal(f.tag, 'proven');
+  assert.equal(out.verified_experiments.length, 1);
+});
+
+test('engine fabrication (claims proven but does not reproduce) => disproven', async () => {
+  const results = [{ engine: 'glm', status: 'ok',
+    result: '[FINDING] fake\nrun: sh -c "exit 0"\nexpects: exit!=0\nobserved: fabricated' }];
+  const out = await annotateWithProof(results, { repoPath: process.cwd(), timeoutMs: 5000 });
+  assert.equal(out.results[0].findings[0].tag, 'disproven');
+});
+
+test('networked finding is engine-claimed, not re-run', async () => {
+  const results = [{ engine: 'codex', status: 'ok',
+    result: '[FINDING] api\nrun: curl https://api.openai.com/x\nexpects: stdout contains "gpt"\nobserved: saw gpt' }];
+  const out = await annotateWithProof(results, { repoPath: process.cwd(), timeoutMs: 5000 });
+  assert.equal(out.results[0].findings[0].tag, 'engine-claimed');
+  assert.equal(out.engine_claimed_experiments.length, 1);
+  assert.equal(out.verified_experiments.length, 0);
+});
+
+test('annotateWithProof: result with status != ok is passed through unchanged', async () => {
+  const results = [{ engine: 'codex', status: 'error', result: '' }];
+  const out = await annotateWithProof(results, { repoPath: process.cwd(), timeoutMs: 5000 });
+  assert.equal(out.results[0].status, 'error');
+  assert.ok(!out.results[0].findings);
+});
+
+test('annotateWithProof: finding without run/expects becomes unproven', async () => {
+  const results = [{ engine: 'codex', status: 'ok',
+    result: '[FINDING] something\nobserved: nothing' }];
+  const out = await annotateWithProof(results, { repoPath: process.cwd(), timeoutMs: 5000 });
+  assert.equal(out.results[0].findings[0].tag, 'unproven');
 });

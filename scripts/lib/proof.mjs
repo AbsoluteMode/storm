@@ -76,6 +76,7 @@ export function predictMatches(expects, res) {
 
 import { spawn } from 'node:child_process';
 import { makeThrowawayCopy, experimentEnv } from './sandbox.mjs';
+import { makeEngineWorkspace } from './workspace.mjs';
 
 const OUTPUT_CAP = 4000; // tail cap per stream (context-protection: bounded artifact)
 
@@ -109,43 +110,65 @@ export function runExperiment(run, cwd, { timeoutMs = 30000, env } = {}) {
   });
 }
 
-// Second pass: prove each engine's findings. PROVEN is granted ONLY here, on a
-// matching orchestrator-captured artifact. Paid/unknown experiments are never
-// run (default-deny) — surfaced for the user instead.
+// Second pass (Stage 1 / back-compat): prove each engine's findings.
+// PROVEN is granted ONLY here, on a matching orchestrator-captured artifact.
+// Paid/unknown experiments are never run (default-deny) — surfaced for the user.
+// WHY: docs/decisions/2026-06-27-proof-required-review.md (verify-don't-trust)
 export async function annotateWithProof(results, { repoPath, timeoutMs = 30000 } = {}) {
-  const executed_experiments = [];
-  const pending_paid_experiments = [];
+  const verified_experiments = [];
+  const engine_claimed_experiments = [];
   const out = [];
   for (const r of results) {
     if (r.status !== 'ok' && r.status !== 'salvaged') { out.push(r); continue; }
     const findings = [];
-    for (const f of parseProofFindings(r.result)) {
-      if (f.tag === 'unproven-cannot') { findings.push(f); continue; }
-      // WHY: docs/decisions/2026-06-27-proof-required-review.md (verify-don't-trust)
-      if (f.tag === 'proven-claimed') {
-        findings.push({ tag: 'unproven-cannot', title: f.title, why: 'engine claimed proof without orchestrator verification' });
+    for (const f of parseFindings(r.result)) {
+      if (f.tag === 'unproven-cannot' || !f.run || !f.expects) {
+        findings.push({ ...f, tag: f.tag === 'finding' ? 'unproven' : f.tag });
         continue;
       }
-      // needs-experiment
-      const cost = classifyCost(f.run, f.cost);
-      if (cost !== 'free') {
-        pending_paid_experiments.push({ engine: r.engine, run: f.run, cost, title: f.title });
-        findings.push({ ...f, tag: 'unproven-needs-paid', cost });
+      if (classifyCost(f.run) !== 'free') {
+        engine_claimed_experiments.push({ engine: r.engine, run: f.run, observed: f.observed, title: f.title });
+        findings.push({ ...f, tag: 'engine-claimed' });
         continue;
       }
-      const { dir, cleanup } = makeThrowawayCopy(repoPath);
+      // verify-don't-trust: re-run in a FRESH clean worktree (no engine edits).
+      const ws = makeEngineWorkspace(repoPath, 'verify');
       let exp;
-      try { exp = await runExperiment(f.run, dir, { timeoutMs, env: experimentEnv() }); }
-      finally { cleanup(); }
-      // Defensive: runExperiment currently always resolves; guard against a future contract change.
-      if (!exp) { findings.push({ tag: 'unproven-cannot', title: f.title, run: f.run, why: 'experiment failed to run' }); continue; }
-      // A timed-out experiment is never proof — the command was killed mid-run
-      // and its exit code is null. Defense-in-depth on top of the matchClause guard.
-      const matched = !exp.timedOut && predictMatches(f.expects, { exitCode: exp.exitCode, stdout: exp.stdoutTail, stderr: exp.stderrTail });
-      executed_experiments.push({ engine: r.engine, run: f.run, exitCode: exp.exitCode, matched, timedOut: exp.timedOut });
-      findings.push({ ...f, tag: matched ? 'proven' : 'disproven', proof: { run: f.run, exitCode: exp.exitCode, stdoutTail: exp.stdoutTail, stderrTail: exp.stderrTail, matched } });
+      try { exp = await runExperiment(f.run, ws.dir, { timeoutMs, env: { ...experimentEnv() } }); }
+      finally { ws.cleanup(); }
+      const matched = !!exp && !exp.timedOut && predictMatches(f.expects, { exitCode: exp.exitCode, stdout: exp.stdoutTail, stderr: exp.stderrTail });
+      verified_experiments.push({ engine: r.engine, run: f.run, exitCode: exp?.exitCode, matched, timedOut: !!exp?.timedOut });
+      findings.push({ ...f, tag: matched ? 'proven' : 'disproven', proof: { run: f.run, exitCode: exp?.exitCode, stdoutTail: exp?.stdoutTail, stderrTail: exp?.stderrTail, matched } });
     }
     out.push({ ...r, findings });
   }
-  return { results: out, executed_experiments, pending_paid_experiments };
+  return { results: out, verified_experiments, engine_claimed_experiments };
+}
+
+// Stage-2 tolerant parser: STORM_RESULT text -> [FINDING] and [UNPROVEN-CANNOT] blocks.
+// Replaces [NEEDS-EXPERIMENT]/[PROVEN] grammar with simpler run/expects/observed fields.
+export function parseFindings(text) {
+  const out = [];
+  let cur = null;
+  const push = () => { if (cur) { out.push(cur); cur = null; } };
+  for (const raw of String(text ?? '').split('\n')) {
+    const line = raw.trim();
+    let m;
+    if ((m = line.match(/^\[FINDING\]\s*(.*)$/i))) {
+      push(); cur = { tag: 'finding', title: m[1].trim() };
+    } else if ((m = line.match(/^\[UNPROVEN-CANNOT\]\s*(.*)$/i))) {
+      push(); const rest = m[1].trim();
+      const wm = rest.match(/^(.*?)\s*[—-]\s*why:\s*(.*)$/i);
+      cur = wm ? { tag: 'unproven-cannot', title: wm[1].trim(), why: wm[2].trim() } : { tag: 'unproven-cannot', title: rest };
+    } else if (cur && (m = line.match(/^run:\s*(.*)$/i))) {
+      cur.run = m[1].trim();
+    } else if (cur && (m = line.match(/^expects:\s*(.*)$/i))) {
+      cur.expects = m[1].trim();
+    } else if (cur && (m = line.match(/^observed:\s*(.*)$/i))) {
+      cur.observed = m[1].trim();
+    }
+    // unknown lines: ignored (tolerant)
+  }
+  push();
+  return out;
 }
