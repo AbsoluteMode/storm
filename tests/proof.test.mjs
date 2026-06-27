@@ -86,3 +86,17 @@ test('predictMatches: empty/unknown clause -> false (conservative)', () => {
   assert.equal(predictMatches('', { exitCode: 1 }), false);
   assert.equal(predictMatches('frobnicate the gizmo', { exitCode: 1 }), false);
 });
+
+test('predictMatches: null exitCode never satisfies exit clauses (timed-out / spawn-failed guard)', () => {
+  // A killed experiment has exitCode: null. Must NOT be treated as proof of exit!=0.
+  assert.equal(predictMatches('exit!=0', { exitCode: null }), false);
+  assert.equal(predictMatches('exit==0', { exitCode: null }), false);
+  assert.equal(predictMatches('exit!=1', { exitCode: null }), false);
+});
+
+test('predictMatches: normal numeric exitCode still works correctly', () => {
+  // Regression guard: real non-zero exit codes must still satisfy exit!=0.
+  assert.equal(predictMatches('exit!=0', { exitCode: 1 }), true);
+  assert.equal(predictMatches('exit!=0', { exitCode: 127 }), true);
+  assert.equal(predictMatches('exit!=0', { exitCode: 0 }), false);
+});

@@ -55,9 +55,13 @@ export function classifyCost(run, declared) {
 
 function matchClause(c, { exitCode, stdout = '', stderr = '' }) {
   let m;
-  if (/^exit\s*!=\s*0$/i.test(c)) return exitCode !== 0;
-  if ((m = c.match(/^exit\s*==\s*(\d+)$/i))) return exitCode === Number(m[1]);
-  if ((m = c.match(/^exit\s*!=\s*(\d+)$/i))) return exitCode !== Number(m[1]);
+  // Exit clauses require a real numeric exit code. null/undefined (e.g. timed-out
+  // or spawn-failed experiments) must never satisfy an exit predicate — returning
+  // true for `exit!=0` when exitCode is null would falsely mark a killed
+  // experiment as proven (the critical verify-don't-trust gap).
+  if (/^exit\s*!=\s*0$/i.test(c)) return typeof exitCode === 'number' && exitCode !== 0;
+  if ((m = c.match(/^exit\s*==\s*(\d+)$/i))) return typeof exitCode === 'number' && exitCode === Number(m[1]);
+  if ((m = c.match(/^exit\s*!=\s*(\d+)$/i))) return typeof exitCode === 'number' && exitCode !== Number(m[1]);
   if ((m = c.match(/^stdout\s+contains\s+["']?(.+?)["']?$/i))) return String(stdout).includes(m[1]);
   if ((m = c.match(/^stderr\s+contains\s+["']?(.+?)["']?$/i))) return String(stderr).includes(m[1]);
   return false; // unknown clause -> not matched (conservative)
@@ -134,7 +138,9 @@ export async function annotateWithProof(results, { repoPath, timeoutMs = 30000 }
       finally { cleanup(); }
       // Defensive: runExperiment currently always resolves; guard against a future contract change.
       if (!exp) { findings.push({ tag: 'unproven-cannot', title: f.title, run: f.run, why: 'experiment failed to run' }); continue; }
-      const matched = predictMatches(f.expects, { exitCode: exp.exitCode, stdout: exp.stdoutTail, stderr: exp.stderrTail });
+      // A timed-out experiment is never proof — the command was killed mid-run
+      // and its exit code is null. Defense-in-depth on top of the matchClause guard.
+      const matched = !exp.timedOut && predictMatches(f.expects, { exitCode: exp.exitCode, stdout: exp.stdoutTail, stderr: exp.stderrTail });
       executed_experiments.push({ engine: r.engine, run: f.run, exitCode: exp.exitCode, matched, timedOut: exp.timedOut });
       findings.push({ ...f, tag: matched ? 'proven' : 'disproven', proof: { run: f.run, exitCode: exp.exitCode, stdoutTail: exp.stdoutTail, stderrTail: exp.stderrTail, matched } });
     }
