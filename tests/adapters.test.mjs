@@ -178,3 +178,43 @@ test('gemini: custom reasoning honored', () => {
   const inv = buildInvocation('gemini', 'P', { apiKey: 'K', reasoning: 'medium' });
   assert.equal(inv.args[2], 'medium');
 });
+
+// --- proof mode: full-rights flags for CLI engines ---
+
+test('codex proof mode => danger-full-access', () => {
+  const inv = buildInvocation('codex', 'p', { proof: true });
+  assert.deepEqual(inv.args, ['exec', '-s', 'danger-full-access']);
+});
+
+test('codex no proof => plain exec (0.8.0)', () => {
+  const inv = buildInvocation('codex', 'p', {});
+  assert.deepEqual(inv.args, ['exec']);
+});
+
+test('claude proof mode => bypassPermissions', () => {
+  const inv = buildInvocation('claude', 'p', { proof: true });
+  assert.ok(inv.args.includes('--permission-mode'));
+  assert.ok(inv.args.includes('bypassPermissions'));
+});
+
+test('claude no proof => no permission-mode (0.8.0)', () => {
+  const inv = buildInvocation('claude', 'p', {});
+  assert.ok(!inv.args.includes('--permission-mode'));
+});
+
+test('glm proof mode => bypassPermissions', () => {
+  const inv = buildInvocation('glm', 'p', { apiKey: 'K', proof: true });
+  assert.ok(inv.args.includes('--permission-mode'));
+  assert.ok(inv.args.includes('bypassPermissions'));
+});
+
+test('glm no proof => no permission-mode (0.8.0)', () => {
+  const inv = buildInvocation('glm', 'p', { apiKey: 'K' });
+  assert.ok(!inv.args.includes('--permission-mode'));
+});
+
+test('gemini proof mode => unchanged (read-only, no exec)', () => {
+  const inv1 = buildInvocation('gemini', 'p', { apiKey: 'K', proof: true });
+  const inv2 = buildInvocation('gemini', 'p', { apiKey: 'K' });
+  assert.deepEqual(inv1.args, inv2.args);
+});

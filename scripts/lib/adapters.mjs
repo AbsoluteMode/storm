@@ -18,11 +18,14 @@ const ADAPTERS = {
   claude: {
     cmd: 'claude',
     stream: true,
-    buildArgs: (_prompt, cfg) => ['-p', ...(cfg.model ? ['--model', cfg.model] : []), ...STREAM_FLAGS],
+    buildArgs: (_prompt, cfg) => ['-p',
+      ...(cfg.proof ? ['--permission-mode', 'bypassPermissions'] : []),
+      ...(cfg.model ? ['--model', cfg.model] : []),
+      ...STREAM_FLAGS],
   },
   codex: {
     cmd: 'codex',
-    buildArgs: () => ['exec'],
+    buildArgs: (_prompt, cfg) => cfg.proof ? ['exec', '-s', 'danger-full-access'] : ['exec'],
   },
   antigravity: {
     cmd: 'agy',
@@ -39,7 +42,11 @@ const ADAPTERS = {
   glm: {
     cmd: 'claude',
     stream: true,
-    buildArgs: (_prompt, cfg) => ['-p', '--model', cfg.model ?? 'glm-5.2', ...STREAM_FLAGS, ...(cfg.effort ? ['--effort', cfg.effort] : [])],
+    buildArgs: (_prompt, cfg) => ['-p',
+      ...(cfg.proof ? ['--permission-mode', 'bypassPermissions'] : []),
+      '--model', cfg.model ?? 'glm-5.2',
+      ...STREAM_FLAGS,
+      ...(cfg.effort ? ['--effort', cfg.effort] : [])],
     buildEnv: (cfg) => {
       if (!cfg.apiKey) throw new Error('glm: missing apiKey (z.ai key required — set it in .storm-secrets.json)');
       return {
