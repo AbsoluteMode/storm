@@ -3,7 +3,7 @@
 // uncommitted + symlinked node_modules); non-git -> cp-fallback. cleanup is
 // idempotent and never throws. WHY: docs/decisions/2026-06-27-stage2-self-experiment.md
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, existsSync, symlinkSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, existsSync, symlinkSync, mkdirSync, copyFileSync, rmSync, lstatSync, readlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { makeThrowawayCopy } from './sandbox.mjs';
@@ -43,7 +43,18 @@ export function makeEngineWorkspace(repoPath, label, deps = {}) {
   for (const rel of untracked) {
     const src = join(repoPath, rel);
     const dst = join(dir, rel);
-    try { mkdirSync(dirname(dst), { recursive: true }); copyFileSync(src, dst); } catch { /* skip unreadable */ }
+    try {
+      mkdirSync(dirname(dst), { recursive: true });
+      // Use lstatSync (not statSync) to detect symlinks without following them.
+      // copyFileSync follows symlinks and copies the target's content, which would
+      // leak outside-repo data into the worktree if a symlink points beyond the
+      // repo boundary. Instead, recreate symlinks faithfully as symlinks.
+      if (lstatSync(src).isSymbolicLink()) {
+        symlinkSync(readlinkSync(src), dst);
+      } else {
+        copyFileSync(src, dst);
+      }
+    } catch { /* skip unreadable */ }
   }
 
   // Symlink node_modules so dependency-needing experiments work without reinstall.

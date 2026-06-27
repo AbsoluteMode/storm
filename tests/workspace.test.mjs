@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync, rmSync, symlinkSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeEngineWorkspace } from '../scripts/lib/workspace.mjs';
@@ -54,4 +54,38 @@ test('non-git path falls back to a cp copy', () => {
     assert.equal(ws.kind, 'copy');
     assert.equal(readFileSync(join(ws.dir, 'f.txt'), 'utf8'), 'hello\n');
   } finally { ws.cleanup(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('untracked symlink pointing outside the repo is recreated as a symlink, not copied as file content', () => {
+  // SECURITY BUG: copyFileSync follows symlinks. An untracked symlink pointing
+  // to a secret outside the repo would have its *target content* copied into
+  // the engine's worktree, leaking outside-repo data and breaking the isolation
+  // boundary. Fix: detect symlinks via lstatSync and recreate them as symlinks
+  // (symlinkSync) instead of copying content.
+  const { dir } = initRepo();
+
+  // Create a secret file OUTSIDE the repo.
+  const outerDir = mkdtempSync(join(tmpdir(), 'storm-outer-'));
+  const secretPath = join(outerDir, 'secret.txt');
+  writeFileSync(secretPath, 'STORM_SYMLINK_SECRET\n');
+
+  // Place an untracked symlink inside the repo pointing to the secret.
+  const symlinkInRepo = join(dir, 'leak');
+  symlinkSync(secretPath, symlinkInRepo);
+
+  const ws = makeEngineWorkspace(dir, 'codex');
+  try {
+    const leakInWs = join(ws.dir, 'leak');
+
+    // After fix: the worktree entry must be a symlink (not a regular file).
+    assert.ok(lstatSync(leakInWs).isSymbolicLink(), 'leak in worktree must be a symlink, not a regular file');
+
+    // The worktree must NOT contain a regular file whose contents are the secret.
+    // (A symlink entry is fine — that is just pointer metadata, not copied content.)
+    assert.ok(!lstatSync(leakInWs).isFile(), 'leak in worktree must not be a regular file with secret content');
+  } finally {
+    ws.cleanup();
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outerDir, { recursive: true, force: true });
+  }
 });
