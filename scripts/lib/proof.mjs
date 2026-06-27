@@ -71,7 +71,7 @@ function matchClause(c, { exitCode, stdout = '', stderr = '' }) {
 export function predictMatches(expects, res) {
   const e = String(expects ?? '').trim();
   if (!e) return false;
-  return e.split(/\s+AND\s+/i).map((c) => c.trim()).filter(Boolean).every((c) => matchClause(c, res));
+  return e.split(/\s+AND\s+/).map((c) => c.trim()).filter(Boolean).every((c) => matchClause(c, res));
 }
 
 import { spawn } from 'node:child_process';

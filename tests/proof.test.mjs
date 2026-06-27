@@ -101,6 +101,22 @@ test('predictMatches: normal numeric exitCode still works correctly', () => {
   assert.equal(predictMatches('exit!=0', { exitCode: 0 }), false);
 });
 
+test('predictMatches: lowercase " and " inside expected substring is data, not an AND separator', () => {
+  // BUG: /\s+AND\s+/i flag mis-splits " and " inside quoted content,
+  // so 'stdout contains "errors and warnings"' becomes two broken clauses
+  // ['stdout contains "errors', 'warnings"'] — neither matches, result is false.
+  // FIX: the separator must be case-SENSITIVE (/\s+AND\s+/, no /i flag).
+  const res = { exitCode: 0, stdout: 'errors and warnings', stderr: '' };
+  // This is the primary repro: a single clause containing " and " must match.
+  assert.equal(predictMatches('stdout contains "errors and warnings"', res), true, 'single clause with lowercase "and" in content should match');
+  // Control: a plain string without "and" still works.
+  assert.equal(predictMatches('stdout contains "errors"', res), true, 'plain control clause should match');
+  // Confirm that uppercase AND still joins two clauses correctly (regression guard).
+  assert.equal(predictMatches('exit==0 AND stdout contains "errors and warnings"', res), true, 'uppercase AND join with lowercase "and" in data still works');
+  // Uppercase AND with a failing clause must still return false (regression guard).
+  assert.equal(predictMatches('exit==1 AND stdout contains "errors and warnings"', res), false, 'uppercase AND join where first clause fails must return false');
+});
+
 // --- parseFindings (new Stage-2 parser) ---
 
 test('parseFindings extracts [FINDING] run/expects/observed', () => {
