@@ -132,6 +132,8 @@ export async function annotateWithProof(results, { repoPath, timeoutMs = 30000 }
       let exp;
       try { exp = await runExperiment(f.run, dir, { timeoutMs, env: experimentEnv() }); }
       finally { cleanup(); }
+      // Defensive: runExperiment currently always resolves; guard against a future contract change.
+      if (!exp) { findings.push({ tag: 'unproven-cannot', title: f.title, run: f.run, why: 'experiment failed to run' }); continue; }
       const matched = predictMatches(f.expects, { exitCode: exp.exitCode, stdout: exp.stdoutTail, stderr: exp.stderrTail });
       executed_experiments.push({ engine: r.engine, run: f.run, exitCode: exp.exitCode, matched, timedOut: exp.timedOut });
       findings.push({ ...f, tag: matched ? 'proven' : 'disproven', proof: { run: f.run, exitCode: exp.exitCode, stdoutTail: exp.stdoutTail, stderrTail: exp.stderrTail, matched } });
