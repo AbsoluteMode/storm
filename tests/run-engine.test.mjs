@@ -166,9 +166,10 @@ test('stream-json: result extracted from the {type:result} event', async () => {
 });
 
 test('stream-json: per-event heartbeat keeps it alive under a small stallMs', async () => {
-  // 5 events x 30ms gaps = ~150ms total > stallMs(100), but each event re-arms
-  // the stall timer, so it must NOT be killed.
-  const r = await runInvocation(invStream('stream-json'), { stallMs: 100, timeoutMs: 8000 });
+  // stream-json-heartbeat emits ~20 NDJSON events x 15ms gaps (~300ms total) with
+  // stallMs=150. Total runtime > stallMs proves re-arm is required; the 10x gap
+  // margin (15ms gap vs 150ms stall) keeps this green even under heavy machine load.
+  const r = await runInvocation(invStream('stream-json-heartbeat'), { stallMs: 150, timeoutMs: 8000 });
   assert.equal(r.status, 'ok', `expected ok (heartbeat alive), got ${r.status}`);
 });
 

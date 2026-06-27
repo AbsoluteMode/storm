@@ -103,6 +103,24 @@ else if (mode === 'stream-json') {
     if (++i >= events.length) { clearInterval(iv); process.exit(0); }
   }, 30);
 }
+// stream-json-heartbeat: emit ~20 NDJSON events at 15ms gaps (~300ms total),
+// then a final result event. Designed for the stall re-arm test with stallMs=150:
+// total runtime (~300ms) > stallMs (150ms) proves re-arm is needed; inter-event
+// gap (15ms) << stallMs (150ms) gives a 10x margin even under machine load.
+else if (mode === 'stream-json-heartbeat') {
+  const N = 20;
+  let i = 0;
+  const iv = setInterval(() => {
+    if (i < N) {
+      process.stdout.write(JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: `tick${i}` } }) + '\n');
+      i++;
+    } else {
+      clearInterval(iv);
+      process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', result: '<STORM_RESULT>\n- heartbeat survived\n</STORM_RESULT>' }) + '\n');
+      process.exit(0);
+    }
+  }, 15);
+}
 // stream-json-nofinal: text_delta events but NO result event -> exercises the
 // delta-assembly fallback. Markers split across two deltas.
 else if (mode === 'stream-json-nofinal') {
