@@ -18,11 +18,15 @@ export function loadSecrets(secretsPath = DEFAULT_PATH) {
 }
 
 // Pure: returns a new engines array with the glm engine carrying apiKey (from
-// secrets.glmApiKey). Other engines pass through untouched. Input is not mutated.
+// secrets.glmApiKey) and every engine carrying experimentEnv if present.
+// Other engines pass through untouched (unless experimentEnv). Input is not mutated.
 export function injectSecrets(engines, secrets = {}) {
+  const expEnv = secrets.experimentEnv && typeof secrets.experimentEnv === 'object' ? secrets.experimentEnv : null;
   return engines.map((e) => {
-    if (e.id === 'glm' && secrets.glmApiKey) return { ...e, apiKey: secrets.glmApiKey };
-    if (e.id === 'gemini' && secrets.openrouterApiKey) return { ...e, apiKey: secrets.openrouterApiKey };
-    return e;
+    let out = e;
+    if (e.id === 'glm' && secrets.glmApiKey) out = { ...out, apiKey: secrets.glmApiKey };
+    if (e.id === 'gemini' && secrets.openrouterApiKey) out = { ...out, apiKey: secrets.openrouterApiKey };
+    if (expEnv) out = { ...out, experimentEnv: expEnv };
+    return out;
   });
 }

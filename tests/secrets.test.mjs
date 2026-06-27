@@ -64,3 +64,16 @@ test('injectSecrets without openrouterApiKey leaves gemini without apiKey', () =
   const out = injectSecrets([{ id: 'gemini' }], {});
   assert.equal(out[0].apiKey, undefined);
 });
+
+test('experimentEnv is attached to every engine', () => {
+  const out = injectSecrets([{ id: 'codex' }, { id: 'glm' }],
+    { glmApiKey: 'g', experimentEnv: { OPENAI_API_KEY: 'sk-test' } });
+  assert.deepEqual(out[0].experimentEnv, { OPENAI_API_KEY: 'sk-test' });
+  assert.deepEqual(out[1].experimentEnv, { OPENAI_API_KEY: 'sk-test' });
+  assert.equal(out[1].apiKey, 'g'); // existing glm injection preserved
+});
+
+test('no experimentEnv => engines unchanged', () => {
+  const out = injectSecrets([{ id: 'codex' }], {});
+  assert.equal(out[0].experimentEnv, undefined);
+});
