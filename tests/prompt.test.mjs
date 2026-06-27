@@ -28,15 +28,21 @@ test('falls back to reviewer for unknown role', () => {
   assert.match(p, /review/i);
 });
 
-test('buildStormPrompt: proof mode adds the proof tag grammar', () => {
-  const p = buildStormPrompt({ task: 'review', proof: true });
-  assert.ok(p.includes('[NEEDS-EXPERIMENT]'), 'proof prompt must teach the NEEDS-EXPERIMENT tag');
-  assert.ok(p.includes('run:') && p.includes('expects:') && p.includes('cost:'));
-  assert.ok(p.includes('[UNPROVEN-CANNOT]'));
+test('proof on => self-experiment contract present', () => {
+  const p = buildStormPrompt({ task: 'audit', role: 'reviewer', repoPath: '/x', proof: true });
+  assert.match(p, /PROOF MODE — self-experiment/);
+  assert.match(p, /\[FINDING\]/);
+  assert.match(p, /The orchestrator will re-run/);
+});
+
+test('proof off => no proof contract (0.8.0 behavior)', () => {
+  const p = buildStormPrompt({ task: 'audit', role: 'reviewer', repoPath: '/x', proof: false });
+  assert.doesNotMatch(p, /PROOF MODE/);
+  assert.doesNotMatch(p, /\[FINDING\]/);
 });
 
 test('buildStormPrompt: default (no proof) stays marker-only, no proof grammar', () => {
   const p = buildStormPrompt({ task: 'review' });
-  assert.ok(!p.includes('[NEEDS-EXPERIMENT]'));
+  assert.doesNotMatch(p, /PROOF MODE/);
   assert.ok(p.includes('<STORM_RESULT>'));
 });

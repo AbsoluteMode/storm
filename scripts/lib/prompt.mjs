@@ -13,18 +13,25 @@ const DEFAULT_CONTRACT = [
   '</STORM_RESULT>',
 ];
 
-const PROOF_CONTRACT = [
-  'Work independently. Every bug you report MUST be PROVABLE. Do NOT assert a bug',
-  'from reading alone. Tag EACH finding inside the markers using this grammar:',
-  '  [NEEDS-EXPERIMENT] <one-line title>',
-  '    run: <a shell command that reproduces the bug>',
-  '    expects: <what output proves it: exit!=0 | stdout contains "X" | stderr contains "X", joined by AND>',
-  '    cost: free | paid:<provider>   (free = local, no network; paid = needs a network/paid API)',
-  '  [UNPROVEN-CANNOT] <title> — why: <race / nondeterminism / no tool available>',
-  'Do NOT output [PROVEN] yourself — the orchestrator runs your experiment and decides.',
+const SELF_EXPERIMENT_CONTRACT = [
+  'PROOF MODE — self-experiment in your isolated copy:',
+  '- Your working directory (`.`) is a throwaway copy of the repo. Do anything:',
+  '  write files, run commands, install deps, use the network.',
+  '- For each finding, REPRODUCE it yourself with a minimal experiment in this',
+  '  copy. Do not describe hypothetically — run it.',
+  '- Attach to each finding, exactly:',
+  '  [FINDING] <one-line title>',
+  '  run: <exact command you ran>',
+  '  expects: <checkable prediction: exit!=0 | exit==N | stdout contains "X" | stderr contains "X"; join clauses with AND>',
+  '  observed: <what actually happened>',
+  '- Mark a finding proven ONLY if you actually reproduced it. If you cannot',
+  '  reproduce it (no tool / non-deterministic), use:',
+  '  [UNPROVEN-CANNOT] <title> — why: <reason>',
+  'The orchestrator will re-run your `run`/`expects` in a clean copy. Fabricated',
+  'results will be caught.',
   'Output ONLY the tagged findings wrapped in the markers, nothing after the close:',
   '<STORM_RESULT>',
-  '[NEEDS-EXPERIMENT] ...',
+  '[FINDING] ...',
   '</STORM_RESULT>',
 ];
 
@@ -35,6 +42,6 @@ export function buildStormPrompt({ task, role = 'reviewer', repoPath, proof = fa
     repoPath ? `Repository: ${repoPath}` : '',
     `Task: ${task}`,
     '',
-    ...(proof ? PROOF_CONTRACT : DEFAULT_CONTRACT),
+    ...(proof ? SELF_EXPERIMENT_CONTRACT : DEFAULT_CONTRACT),
   ].filter(Boolean).join('\n');
 }
