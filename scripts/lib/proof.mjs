@@ -121,6 +121,7 @@ export async function annotateWithProof(results, { repoPath, timeoutMs = 30000 }
     const findings = [];
     for (const f of parseProofFindings(r.result)) {
       if (f.tag === 'unproven-cannot') { findings.push(f); continue; }
+      // WHY: docs/decisions/2026-06-27-proof-required-review.md (verify-don't-trust)
       if (f.tag === 'proven-claimed') {
         findings.push({ tag: 'unproven-cannot', title: f.title, why: 'engine claimed proof without orchestrator verification' });
         continue;
