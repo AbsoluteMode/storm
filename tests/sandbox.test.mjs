@@ -11,6 +11,7 @@ function fakeRepo() {
   writeFileSync(join(dir, 'app.js'), 'console.log(1)');
   writeFileSync(join(dir, '.storm-secrets.json'), '{"glmApiKey":"SECRET"}');
   writeFileSync(join(dir, '.env'), 'TOKEN=abc');
+  writeFileSync(join(dir, '.envrc'), 'export TOKEN=x');
   mkdirSync(join(dir, '.git')); writeFileSync(join(dir, '.git', 'config'), '[core]');
   mkdirSync(join(dir, 'node_modules')); writeFileSync(join(dir, 'node_modules', 'x.js'), 'x');
   return dir;
@@ -25,6 +26,7 @@ test('makeThrowawayCopy: copies source, excludes .git/node_modules/secrets', () 
     assert.ok(!existsSync(join(dir, 'node_modules')), 'node_modules excluded');
     assert.ok(!existsSync(join(dir, '.storm-secrets.json')), 'secrets excluded');
     assert.ok(!existsSync(join(dir, '.env')), '.env excluded');
+    assert.ok(!existsSync(join(dir, '.envrc')), '.envrc excluded');
   } finally { cleanup(); rmSync(src, { recursive: true, force: true }); }
 });
 

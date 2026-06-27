@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, basename } from 'node:path';
 
 const EXCLUDE = new Set(['.git', 'node_modules', '.storm-secrets.json', '.venv', '.pytest_cache', '__pycache__', 'dist', 'build']);
-const EXCLUDE_RE = [/^\.env(\.|$)/, /\.secret$/];
+const EXCLUDE_RE = [/^\.env/, /\.secret$/];
 
 function included(src) {
   const base = basename(src);
