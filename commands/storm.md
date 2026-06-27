@@ -34,4 +34,14 @@ You are the Storm orchestrator. On this command:
 4. Return a single structured answer. Do not dump raw per-engine results
    verbatim.
 
+When proof mode is on, results carry per-finding proof tags and the output adds
+`executed_experiments` (what the orchestrator ran in an isolated copy) and
+`pending_paid_experiments`. Synthesis rules:
+- Only `proven` findings are reported as confirmed bugs.
+- `disproven` findings are dropped (the experiment did not reproduce).
+- `unproven-cannot` / `unproven-needs-paid` go in a separate "not proven" section.
+- For each `pending_paid_experiments` entry, WARN the user that proving it costs
+  money (show the command + provider) BEFORE any execution. Stage 1 does not run
+  paid experiments — it only surfaces them.
+
 Only `plan` mode (read-only) exists in v1. `action` mode is a future phase.

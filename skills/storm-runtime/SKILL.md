@@ -16,3 +16,6 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/storm-companion.mjs" plan "<task>" 
 - Parse output, not exit codes.
 - Engines with status `stalled`/`auth_required`/`timeout`/`error`/`no_result` are degraded,
   not fatal: synthesize from the engines that answered.
+- Proof mode (`config.proof.enabled`): findings are tagged proven/disproven/unproven-*;
+  output adds `executed_experiments` + `pending_paid_experiments`. Only `proven` are
+  confirmed bugs; paid experiments are surfaced, never auto-run.

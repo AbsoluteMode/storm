@@ -5,7 +5,7 @@ import { buildStormPrompt } from './prompt.mjs';
 export async function runAll(task, engines, opts = {}) {
   const runner = opts.runner ?? runEngine;
   const role = opts.role ?? 'reviewer';
-  const prompt = buildStormPrompt({ task, role, repoPath: opts.cwd });
+  const prompt = buildStormPrompt({ task, role, repoPath: opts.cwd, proof: opts.proof });
   const settled = await Promise.allSettled(
     engines.map((e) => {
       try {

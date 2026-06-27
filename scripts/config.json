@@ -2,6 +2,7 @@
   "role": "reviewer",
   "timeoutMs": null,
   "stallMs": null,
+  "proof": { "enabled": true, "experimentTimeoutMs": 30000 },
   "engines": [
     { "id": "claude", "model": null },
     { "id": "codex" },

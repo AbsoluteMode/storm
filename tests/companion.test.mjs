@@ -22,3 +22,9 @@ test('--cwd nonexistent -> exit 2 (fail-fast, never a silent run)', () => {
   assert.equal(r.status, 2);
   assert.match(r.stderr, /does not exist|cwd/i);
 });
+
+test('proof config block exists and is enabled by default', async () => {
+  const cfg = JSON.parse(await import('node:fs').then((fs) => fs.readFileSync(new URL('../scripts/config.json', import.meta.url), 'utf8')));
+  assert.equal(cfg.proof.enabled, true);
+  assert.equal(typeof cfg.proof.experimentTimeoutMs, 'number');
+});

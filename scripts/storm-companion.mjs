@@ -23,11 +23,18 @@ async function main() {
   const results = await runAll(task, engines, {
     role: cfg.role,
     cwd, // resolved + validated; cascades to spawn cwd -> all engines + Gemini sandbox
+    proof: cfg.proof?.enabled,
     timeoutMs: cfg.timeoutMs,
     stallMs: cfg.stallMs,
   });
   // repoPath echoes the dir the council actually read -> wrong-repo mismatch is visible.
-  process.stdout.write(JSON.stringify({ mode, task, repoPath: cwd, results }, null, 2) + '\n');
+  let out = { mode, task, repoPath: cwd, results };
+  if (cfg.proof?.enabled) {
+    const { annotateWithProof } = await import('./lib/proof.mjs');
+    const proofed = await annotateWithProof(results, { repoPath: cwd, timeoutMs: cfg.proof.experimentTimeoutMs });
+    out = { mode, task, repoPath: cwd, results: proofed.results, executed_experiments: proofed.executed_experiments, pending_paid_experiments: proofed.pending_paid_experiments };
+  }
+  process.stdout.write(JSON.stringify(out, null, 2) + '\n');
 }
 
 main().catch((e) => {
