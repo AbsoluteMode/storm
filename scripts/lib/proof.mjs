@@ -71,6 +71,7 @@ export function predictMatches(expects, res) {
 }
 
 import { spawn } from 'node:child_process';
+import { makeThrowawayCopy, experimentEnv } from './sandbox.mjs';
 
 const OUTPUT_CAP = 4000; // tail cap per stream (context-protection: bounded artifact)
 
@@ -102,4 +103,40 @@ export function runExperiment(run, cwd, { timeoutMs = 30000, env } = {}) {
     child.on('error', (e) => { stderr += String(e.message); finish(null); });
     child.on('close', (code) => finish(code));
   });
+}
+
+// Second pass: prove each engine's findings. PROVEN is granted ONLY here, on a
+// matching orchestrator-captured artifact. Paid/unknown experiments are never
+// run (default-deny) — surfaced for the user instead.
+export async function annotateWithProof(results, { repoPath, timeoutMs = 30000 } = {}) {
+  const executed_experiments = [];
+  const pending_paid_experiments = [];
+  const out = [];
+  for (const r of results) {
+    if (r.status !== 'ok' && r.status !== 'salvaged') { out.push(r); continue; }
+    const findings = [];
+    for (const f of parseProofFindings(r.result)) {
+      if (f.tag === 'unproven-cannot') { findings.push(f); continue; }
+      if (f.tag === 'proven-claimed') {
+        findings.push({ tag: 'unproven-cannot', title: f.title, why: 'engine claimed proof without orchestrator verification' });
+        continue;
+      }
+      // needs-experiment
+      const cost = classifyCost(f.run, f.cost);
+      if (cost !== 'free') {
+        pending_paid_experiments.push({ engine: r.engine, run: f.run, cost, title: f.title });
+        findings.push({ ...f, tag: 'unproven-needs-paid', cost });
+        continue;
+      }
+      const { dir, cleanup } = makeThrowawayCopy(repoPath);
+      let exp;
+      try { exp = await runExperiment(f.run, dir, { timeoutMs, env: experimentEnv() }); }
+      finally { cleanup(); }
+      const matched = predictMatches(f.expects, { exitCode: exp.exitCode, stdout: exp.stdoutTail, stderr: exp.stderrTail });
+      executed_experiments.push({ engine: r.engine, run: f.run, exitCode: exp.exitCode, matched, timedOut: exp.timedOut });
+      findings.push({ ...f, tag: matched ? 'proven' : 'disproven', proof: { run: f.run, exitCode: exp.exitCode, stdoutTail: exp.stdoutTail, stderrTail: exp.stderrTail, matched } });
+    }
+    out.push({ ...r, findings });
+  }
+  return { results: out, executed_experiments, pending_paid_experiments };
 }
