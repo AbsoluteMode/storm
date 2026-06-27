@@ -125,7 +125,7 @@ repro, это другой класс процесса, не регресс live
 ## Контракт результата
 
 JSON companion: к `{ mode, task, repoPath, results }` добавляются `executed_experiments[]`
-(`{engine, run, exitCode, matched, tag}`) и `pending_paid_experiments[]`
+(`{engine, run, exitCode, matched, timedOut}`) и `pending_paid_experiments[]`
 (`{engine, run, cost, why}`). Статусы движков (`ok`/`salvaged`/…) — без изменений.
 При `proof.enabled=false` вывод тождествен 0.8.0 (регресс-гард).
 
@@ -158,7 +158,9 @@ JSON companion: к `{ mode, task, repoPath, results }` добавляются `e
    только нормализованный, капнутый оркестратором артефакт (лимиты как `MAX_FILE`).
 7. **Malformed proof-грамматика** → толерантный парс; нераспознанное → `unproven`, не
    теряется.
-8. **Orphaned-копии при kill оркестратора** → cleanup на `SIGINT`/`exit` (gemini-вклад).
+8. **Orphaned-копии при kill оркестратора** (Ctrl-C во время эксперимента) → копии лежат
+   в OS `tmpdir` (без секретов/`.git`) и собираются ОС; нормальный путь чистит в `finally`.
+   Hard-cleanup на `SIGINT`/`exit` отложен в Stage 3 (в MVP не реализован — осознанно).
 
 ## Тестирование (TDD)
 
