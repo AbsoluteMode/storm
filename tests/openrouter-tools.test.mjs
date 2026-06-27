@@ -18,6 +18,13 @@ test('isBlocked: catches Windows backslash paths too (cross-platform sandbox)', 
   assert.ok(!isBlocked('scripts/lib/run-engine.mjs', 'scripts/lib/run-engine.mjs'));
 });
 
+test('isBlocked: blocks .envrc and other .env* variants', () => {
+  assert.ok(isBlocked('.envrc', '.envrc'), '.envrc must be blocked');
+  assert.ok(isBlocked('sub/.envrc', 'sub/.envrc'), 'nested .envrc must be blocked');
+  assert.ok(isBlocked('.env.local', '.env.local'), '.env.local must be blocked');
+  assert.ok(isBlocked('.env.example', '.env.example'), '.env.example must be blocked');
+});
+
 function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), 'storm-sb-'));
   writeFileSync(join(dir, 'a.txt'), 'hello world\nsecond line\n');

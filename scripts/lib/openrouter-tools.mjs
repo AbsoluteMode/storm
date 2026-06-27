@@ -11,7 +11,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 
 const BLOCKED = [
   /(^|\/)\.storm-secrets\.json$/,
-  /(^|\/)\.env(\.|$)/,
+  /(^|\/)\.env/,
   /\.secret$/,
   /(^|\/)\.git(\/|$)/,
 ];
