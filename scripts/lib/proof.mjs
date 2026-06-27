@@ -69,3 +69,37 @@ export function predictMatches(expects, res) {
   if (!e) return false;
   return e.split(/\s+AND\s+/i).map((c) => c.trim()).filter(Boolean).every((c) => matchClause(c, res));
 }
+
+import { spawn } from 'node:child_process';
+
+const OUTPUT_CAP = 4000; // tail cap per stream (context-protection: bounded artifact)
+
+// Run an experiment command in `cwd` (a throwaway copy), bounded by timeoutMs.
+// Detached process group so a hung repro (and its children) is killed wholesale.
+// Experiments MUST be bounded — unlike engines (no-timeouts liveness).
+export function runExperiment(run, cwd, { timeoutMs = 30000, env } = {}) {
+  return new Promise((resolve) => {
+    let stdout = '', stderr = '', settled = false, timedOut = false;
+    const start = Date.now();
+    const finish = (exitCode) => {
+      if (settled) return; settled = true;
+      clearTimeout(timer);
+      resolve({ exitCode, stdoutTail: stdout.slice(-OUTPUT_CAP), stderrTail: stderr.slice(-OUTPUT_CAP), durationMs: Date.now() - start, timedOut });
+    };
+    let child;
+    try {
+      child = spawn('/bin/sh', ['-c', run], { cwd, env: env ?? process.env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      return resolve({ exitCode: null, stdoutTail: '', stderrTail: String(e.message), durationMs: 0, timedOut: false });
+    }
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* gone */ } }
+      finish(null);
+    }, timeoutMs);
+    child.stdout.on('data', (d) => { stdout += d; });
+    child.stderr.on('data', (d) => { stderr += d; });
+    child.on('error', (e) => { stderr += String(e.message); finish(null); });
+    child.on('close', (code) => finish(code));
+  });
+}
