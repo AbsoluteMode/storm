@@ -38,3 +38,34 @@ export function parseProofFindings(text) {
   push();
   return findings;
 }
+
+const PAID_HOSTS = [/openrouter\.ai/i, /api\.openai\.com/i, /anthropic/i, /generativelanguage/i, /amazonaws\.com/i, /\bz\.ai/i];
+const NET_PATTERNS = [/\bcurl\b/i, /\bwget\b/i, /\bssh\b/i, /https?:\/\//i, /\bnpm\s+(i|install)\b/i, /\bpip\s+install\b/i, /\bdocker\s+(pull|run)\b/i, /\byarn\s+add\b/i];
+
+// Classify an experiment's cost. Declarations are NOT trusted: a command that
+// looks networked/paid but is declared free is downgraded to 'unknown'. The
+// caller treats 'unknown' as 'paid' (default-deny).
+export function classifyCost(run, declared) {
+  if (String(declared ?? '').toLowerCase().startsWith('paid')) return 'paid';
+  const cmd = String(run ?? '');
+  if (!cmd.trim()) return 'unknown';
+  const suspicious = PAID_HOSTS.some((re) => re.test(cmd)) || NET_PATTERNS.some((re) => re.test(cmd));
+  return suspicious ? 'unknown' : 'free';
+}
+
+function matchClause(c, { exitCode, stdout = '', stderr = '' }) {
+  let m;
+  if (/^exit\s*!=\s*0$/i.test(c)) return exitCode !== 0;
+  if ((m = c.match(/^exit\s*==\s*(\d+)$/i))) return exitCode === Number(m[1]);
+  if ((m = c.match(/^exit\s*!=\s*(\d+)$/i))) return exitCode !== Number(m[1]);
+  if ((m = c.match(/^stdout\s+contains\s+["']?(.+?)["']?$/i))) return String(stdout).includes(m[1]);
+  if ((m = c.match(/^stderr\s+contains\s+["']?(.+?)["']?$/i))) return String(stderr).includes(m[1]);
+  return false; // unknown clause -> not matched (conservative)
+}
+
+// Does the captured result satisfy the engine's prediction? Clauses joined by AND.
+export function predictMatches(expects, res) {
+  const e = String(expects ?? '').trim();
+  if (!e) return false;
+  return e.split(/\s+AND\s+/i).map((c) => c.trim()).filter(Boolean).every((c) => matchClause(c, res));
+}

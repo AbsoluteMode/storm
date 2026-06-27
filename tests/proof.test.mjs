@@ -1,7 +1,7 @@
 // tests/proof.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseProofFindings } from '../scripts/lib/proof.mjs';
+import { parseProofFindings, classifyCost, predictMatches } from '../scripts/lib/proof.mjs';
 
 test('parseProofFindings: NEEDS-EXPERIMENT with run/expects/cost sub-grammar', () => {
   const text = [
@@ -48,4 +48,41 @@ test('parseProofFindings: multiple findings, tolerant of junk lines', () => {
 test('parseProofFindings: empty / nullish input -> []', () => {
   assert.deepEqual(parseProofFindings(''), []);
   assert.deepEqual(parseProofFindings(null), []);
+});
+
+test('classifyCost: declared paid wins', () => {
+  assert.equal(classifyCost('node x.mjs', 'paid:openai'), 'paid');
+});
+
+test('classifyCost: plain local command -> free', () => {
+  assert.equal(classifyCost('node --test', 'free'), 'free');
+  assert.equal(classifyCost('npm test', undefined), 'free');
+});
+
+test('classifyCost: networked/paid-looking but declared free -> unknown (default-deny)', () => {
+  assert.equal(classifyCost('curl https://api.openai.com/v1', 'free'), 'unknown');
+  assert.equal(classifyCost('node hit.mjs && wget http://x', 'free'), 'unknown');
+  assert.equal(classifyCost('npm install left-pad', 'free'), 'unknown');
+});
+
+test('classifyCost: empty command -> unknown', () => {
+  assert.equal(classifyCost('', 'free'), 'unknown');
+});
+
+test('predictMatches: exit clauses', () => {
+  assert.equal(predictMatches('exit!=0', { exitCode: 1 }), true);
+  assert.equal(predictMatches('exit!=0', { exitCode: 0 }), false);
+  assert.equal(predictMatches('exit==2', { exitCode: 2 }), true);
+});
+
+test('predictMatches: contains clauses + AND', () => {
+  const res = { exitCode: 1, stdout: 'boom', stderr: 'Cannot read x' };
+  assert.equal(predictMatches('stderr contains "Cannot read"', res), true);
+  assert.equal(predictMatches('exit!=0 AND stdout contains "boom"', res), true);
+  assert.equal(predictMatches('exit==0 AND stdout contains "boom"', res), false);
+});
+
+test('predictMatches: empty/unknown clause -> false (conservative)', () => {
+  assert.equal(predictMatches('', { exitCode: 1 }), false);
+  assert.equal(predictMatches('frobnicate the gizmo', { exitCode: 1 }), false);
 });
