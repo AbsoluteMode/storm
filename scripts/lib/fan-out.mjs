@@ -20,7 +20,7 @@ export async function runAll(task, engines, opts = {}) {
         // e.experimentEnv flows to the child via run-engine's opts.env merge.
         return await runner(e.id, prompt, cfg, {
           timeoutMs: opts.timeoutMs,
-          stallMs: opts.stallMs,
+          stallMs: e.stallMs ?? opts.stallMs,
           cwd,
           env: e.experimentEnv,
         });

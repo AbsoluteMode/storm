@@ -155,3 +155,27 @@ test('proof mode: experimentEnv from engine config is passed as opts.env to runn
     rmSync(repoPath, { recursive: true, force: true });
   }
 });
+
+test('per-engine stallMs is threaded into each runner call; missing falls back to global', async () => {
+  const seen = {};
+  const runner = (id, _p, _c, opts) => {
+    seen[id] = opts.stallMs;
+    return Promise.resolve({ engine: id, status: 'ok', result: 'r' });
+  };
+  const engines = [{ id: 'claude', stallMs: 20000 }, { id: 'codex', stallMs: 180000 }, { id: 'glm' }];
+  await runAll('task', engines, { runner, stallMs: 999 });
+  assert.equal(seen.claude, 20000);
+  assert.equal(seen.codex, 180000);
+  assert.equal(seen.glm, 999); // no per-engine value -> global fallback
+});
+
+test('partial synthesis: a stalled engine resolves and does not block the others', async () => {
+  const runner = (id) =>
+    id === 'glm'
+      ? Promise.resolve({ engine: id, status: 'stalled', error: 'no output for 60000ms' })
+      : Promise.resolve({ engine: id, status: 'ok', result: 'r' });
+  const results = await runAll('task', [{ id: 'claude' }, { id: 'glm' }, { id: 'codex' }], { runner });
+  assert.equal(results.length, 3);
+  assert.equal(results.find((r) => r.engine === 'glm').status, 'stalled');
+  assert.equal(results.filter((r) => r.status === 'ok').length, 2);
+});
