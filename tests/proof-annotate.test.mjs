@@ -96,6 +96,12 @@ test('annotateWithProof: two findings in one ok result — one proven, one unpro
   assert.equal(findings[1].tag, 'unproven-cannot', `second finding should be unproven-cannot, got ${findings[1].tag}`);
 });
 
+test('annotateWithProof preserves resolvedModel on each result', async () => {
+  const results = [{ engine: 'claude', status: 'ok', result: 'no findings here', resolvedModel: 'claude-opus-4-8' }];
+  const out = await annotateWithProof(results, { repoPath: process.cwd() });
+  assert.equal(out.results[0].resolvedModel, 'claude-opus-4-8');
+});
+
 test('annotateWithProof: a timed-out experiment must be disproven, never proven (CRITICAL verify-dont-trust)', async () => {
   const results = [{ engine: 'claude', status: 'ok', result: [
     '[FINDING] Hung process',

@@ -24,6 +24,7 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
     let stderr = '';
     let jsonBuf = '';      // unparsed NDJSON tail (stream engines only)
     let finalText = null;  // null = no result event seen yet; '' = an empty result event
+    let resolvedModel = null; // captured from stream init (claude/glm) or codex stderr header
     const deltas = [];     // text_delta chunks (fallback when no result event)
     let settled = false;
     let lastActivity = Date.now();
@@ -36,7 +37,7 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
       if (settled) return;
       settled = true;
       clearTimers();
-      resolve({ ...res, lastActivityMs: Date.now() - lastActivity });
+      resolve({ ...res, lastActivityMs: Date.now() - lastActivity, resolvedModel });
     };
     let child;
     try {
@@ -108,6 +109,8 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
           typeof ev.delta.text === 'string'
         ) {
           deltas.push(ev.delta.text);
+        } else if (ev.type === 'system' && ev.subtype === 'init' && typeof ev.model === 'string') {
+          resolvedModel = ev.model;
         }
       }
     };
@@ -115,6 +118,10 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
       lastActivity = Date.now();
       chunkCount += 1;
       armStall(); // reset inactivity timer on any output
+      if (!resolvedModel) {
+        const m = stderr.match(/^[ \t]*model:[ \t]*(.+?)[ \t]*$/m);
+        if (m) resolvedModel = m[1].trim();
+      }
       // Guard the consumer callback: onActivity runs inside the stdout/stderr 'data'
       // handlers, so a throwing onProgress would escape a stream handler and hang the
       // run (finish() never reached). Swallow consumer throws.

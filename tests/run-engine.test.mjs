@@ -264,6 +264,23 @@ test('opts.env: custom var in opts.env reaches the child, merged over inv.env (o
 
 // --- onProgress callback: liveness & visibility v2 ---
 
+test('stream-json: resolvedModel captured from the system/init event', async () => {
+  const r = await runInvocation(invStream('stream-json'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.status, 'ok');
+  assert.equal(r.resolvedModel, 'fake-stream-model');
+});
+
+test('codex-style stderr header: resolvedModel captured via the model: regex', async () => {
+  const r = await runInvocation(inv('codex-header'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
+  assert.equal(r.resolvedModel, 'gpt-5.5-test');
+});
+
+test('no model in output -> resolvedModel is null (not undefined)', async () => {
+  const r = await runInvocation(inv('ok'), { stallMs: 5000, timeoutMs: 8000 });
+  assert.equal(r.resolvedModel, null);
+});
+
 test('onProgress fires on activity with a growing chunk count', async () => {
   const seen = [];
   const r = await runInvocation(inv('slow-stream'), {

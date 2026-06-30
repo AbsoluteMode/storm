@@ -86,12 +86,20 @@ else if (mode === 'cwd') {
   process.stdout.write(`<STORM_RESULT>\n${process.cwd()}\n</STORM_RESULT>\n`);
   process.exit(0);
 }
+// codex-header: emit a codex-style session header in stderr (carrying the model)
+// then a valid result in stdout. Exercises resolvedModel capture via the stderr
+// `model:` regex (codex does not use stream-json).
+else if (mode === 'codex-header') {
+  process.stderr.write('OpenAI Codex v0.139.0\n--------\nmodel: gpt-5.5-test\nprovider: openai\n--------\n');
+  process.stdout.write('<STORM_RESULT>\n- codex finding\n</STORM_RESULT>\n');
+  process.exit(0);
+}
 // stream-json: emit NDJSON events with gaps (heartbeat), then a final result
 // event carrying the STORM_RESULT markers. Simulates claude/glm under
 // --output-format stream-json. The 30ms gaps exercise stall re-arming.
 else if (mode === 'stream-json') {
   const events = [
-    { type: 'system', subtype: 'init' },
+    { type: 'system', subtype: 'init', model: 'fake-stream-model' },
     { type: 'content_block_delta', delta: { type: 'thinking_delta', thinking: 'reasoning...' } },
     { type: 'content_block_delta', delta: { type: 'text_delta', text: '<STORM_' } },
     { type: 'content_block_delta', delta: { type: 'text_delta', text: 'RESULT>\n- streamed\n</STORM_RESULT>' } },
