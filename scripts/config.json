@@ -4,9 +4,8 @@
   "stallMs": null,
   "proof": { "enabled": true, "experimentTimeoutMs": 30000 },
   "engines": [
-    { "id": "claude", "model": null },
+    { "id": "claude", "model": "opus" },
     { "id": "codex" },
-    { "id": "glm", "model": "glm-5.2", "effort": "max" },
-    { "id": "gemini", "model": "google/gemini-3.5-flash", "reasoning": "high" }
+    { "id": "glm", "model": "glm-5.2", "effort": "max" }
   ]
 }
