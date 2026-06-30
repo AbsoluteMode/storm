@@ -179,3 +179,26 @@ test('partial synthesis: a stalled engine resolves and does not block the others
   assert.equal(results.find((r) => r.engine === 'glm').status, 'stalled');
   assert.equal(results.filter((r) => r.status === 'ok').length, 2);
 });
+
+test('heartbeat emits a periodic per-engine progress line to onHeartbeat', async () => {
+  const lines = [];
+  const runner = async (id, _p, _c, opts) => {
+    opts.onProgress?.({ chunks: 3, lastActivityAt: Date.now() });
+    await new Promise((r) => setTimeout(r, 70)); // ~3x the 20ms heartbeat -> >=1 tick
+    return { engine: id, status: 'ok', result: 'r' };
+  };
+  await runAll('task', [{ id: 'claude' }, { id: 'codex' }], {
+    runner, heartbeatMs: 20, onHeartbeat: (l) => lines.push(l),
+  });
+  assert.ok(lines.length > 0, 'should emit at least one heartbeat line');
+  assert.match(lines[0], /\[storm \+\d+s\]/);
+  assert.match(lines[0], /claude:/);
+  assert.match(lines[0], /codex:/);
+});
+
+test('heartbeatMs <= 0 disables the heartbeat', async () => {
+  const lines = [];
+  const runner = (id) => Promise.resolve({ engine: id, status: 'ok', result: 'r' });
+  await runAll('task', [{ id: 'claude' }], { runner, heartbeatMs: 0, onHeartbeat: (l) => lines.push(l) });
+  assert.equal(lines.length, 0);
+});
