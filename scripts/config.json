@@ -4,8 +4,8 @@
   "stallMs": null,
   "proof": { "enabled": true, "experimentTimeoutMs": 30000 },
   "engines": [
-    { "id": "claude", "model": "opus" },
-    { "id": "codex" },
-    { "id": "glm", "model": "glm-5.2", "effort": "max" }
+    { "id": "claude", "model": "opus", "stallMs": 20000 },
+    { "id": "codex", "stallMs": 180000 },
+    { "id": "glm", "model": "glm-5.2", "effort": "max", "stallMs": 60000 }
   ]
 }

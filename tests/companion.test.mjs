@@ -28,3 +28,12 @@ test('proof config block exists and is enabled by default', async () => {
   assert.equal(cfg.proof.enabled, true);
   assert.equal(typeof cfg.proof.experimentTimeoutMs, 'number');
 });
+
+test('each engine carries its calibrated per-engine stallMs', async () => {
+  const fs = await import('node:fs');
+  const cfg = JSON.parse(fs.readFileSync(new URL('../scripts/config.json', import.meta.url), 'utf8'));
+  const byId = Object.fromEntries(cfg.engines.map((e) => [e.id, e]));
+  assert.equal(byId.claude.stallMs, 20000);
+  assert.equal(byId.codex.stallMs, 180000);
+  assert.equal(byId.glm.stallMs, 60000);
+});
