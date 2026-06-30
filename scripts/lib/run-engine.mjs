@@ -27,6 +27,7 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
     const deltas = [];     // text_delta chunks (fallback when no result event)
     let settled = false;
     let lastActivity = Date.now();
+    let chunkCount = 0;
     let backstopTimer;
     let stallTimer;
     let authTimer;
@@ -112,7 +113,15 @@ export function runInvocation({ engine, cmd, args, input, env, stream }, opts = 
     };
     const onActivity = () => {
       lastActivity = Date.now();
+      chunkCount += 1;
       armStall(); // reset inactivity timer on any output
+      // Guard the consumer callback: onActivity runs inside the stdout/stderr 'data'
+      // handlers, so a throwing onProgress would escape a stream handler and hang the
+      // run (finish() never reached). Swallow consumer throws.
+      if (opts.onProgress) {
+        try { opts.onProgress({ chunks: chunkCount, lastActivityAt: lastActivity }); }
+        catch { /* a misbehaving consumer callback must not break onActivity */ }
+      }
       const tail = (stdout.slice(-AUTH_SCAN_TAIL)) + '\n' + (stderr.slice(-AUTH_SCAN_TAIL));
       if (detectAuthPrompt(tail)) {
         armAuthGrace();

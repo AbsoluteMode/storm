@@ -261,3 +261,27 @@ test('opts.env: custom var in opts.env reaches the child, merged over inv.env (o
   assert.equal(r.status, 'ok', `expected ok, got ${r.status}: ${r.error}`);
   assert.equal(r.result, 'from-opts-env|PATH_PRESENT');
 });
+
+// --- onProgress callback: liveness & visibility v2 ---
+
+test('onProgress fires on activity with a growing chunk count', async () => {
+  const seen = [];
+  const r = await runInvocation(inv('slow-stream'), {
+    stallMs: 5000, timeoutMs: 8000,
+    onProgress: (s) => seen.push({ chunks: s.chunks, lastActivityAt: s.lastActivityAt }),
+  });
+  assert.equal(r.status, 'ok');
+  assert.ok(seen.length > 0, 'onProgress should fire at least once');
+  assert.ok(seen.every((s) => typeof s.chunks === 'number'), 'chunks should be numbers');
+  // Strict +1 monotonicity: every tick increments the counter by exactly 1 (the
+  // contract Task 4 fan-out consumes — a skipped/duplicated count would mislead it).
+  assert.ok(
+    seen.every((s, i) => i === 0 || s.chunks === seen[i - 1].chunks + 1),
+    'chunks must increment by 1 each tick',
+  );
+  // lastActivityAt is a Date.now() timestamp of the tick — a positive number every time.
+  assert.ok(
+    seen.every((s) => typeof s.lastActivityAt === 'number' && s.lastActivityAt > 0),
+    'lastActivityAt must be a positive number on every tick',
+  );
+});
