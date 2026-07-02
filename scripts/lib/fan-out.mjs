@@ -40,7 +40,9 @@ export async function runAll(task, engines, opts = {}) {
       };
       try {
         const cwd = proof ? (ws = makeEngineWorkspace(opts.cwd, e.id)).dir : opts.cwd;
-        const cfg = { ...e, proof };
+        // fullRights: proof engines self-experiment with write/exec/network in
+        // their worktrees; delegate mode sets this unconditionally.
+        const cfg = { ...e, fullRights: proof };
         const res = await runner(e.id, prompt, cfg, {
           timeoutMs: opts.timeoutMs,
           stallMs: e.stallMs ?? opts.stallMs,

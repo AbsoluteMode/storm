@@ -179,42 +179,42 @@ test('gemini: custom reasoning honored', () => {
   assert.equal(inv.args[2], 'medium');
 });
 
-// --- proof mode: full-rights flags for CLI engines ---
+// --- full rights: flags for CLI engines (proof mode and delegate mode) ---
 
-test('codex proof mode => danger-full-access', () => {
-  const inv = buildInvocation('codex', 'p', { proof: true });
+test('codex fullRights => danger-full-access', () => {
+  const inv = buildInvocation('codex', 'p', { fullRights: true });
   assert.deepEqual(inv.args, ['exec', '-s', 'danger-full-access']);
 });
 
-test('codex no proof => plain exec (0.8.0)', () => {
+test('codex no fullRights => plain exec (0.8.0)', () => {
   const inv = buildInvocation('codex', 'p', {});
   assert.deepEqual(inv.args, ['exec']);
 });
 
-test('claude proof mode => bypassPermissions', () => {
-  const inv = buildInvocation('claude', 'p', { proof: true });
+test('claude fullRights => bypassPermissions', () => {
+  const inv = buildInvocation('claude', 'p', { fullRights: true });
   assert.ok(inv.args.includes('--permission-mode'));
   assert.ok(inv.args.includes('bypassPermissions'));
 });
 
-test('claude no proof => no permission-mode (0.8.0)', () => {
+test('claude no fullRights => no permission-mode (0.8.0)', () => {
   const inv = buildInvocation('claude', 'p', {});
   assert.ok(!inv.args.includes('--permission-mode'));
 });
 
-test('glm proof mode => bypassPermissions', () => {
-  const inv = buildInvocation('glm', 'p', { apiKey: 'K', proof: true });
+test('glm fullRights => bypassPermissions', () => {
+  const inv = buildInvocation('glm', 'p', { apiKey: 'K', fullRights: true });
   assert.ok(inv.args.includes('--permission-mode'));
   assert.ok(inv.args.includes('bypassPermissions'));
 });
 
-test('glm no proof => no permission-mode (0.8.0)', () => {
+test('glm no fullRights => no permission-mode (0.8.0)', () => {
   const inv = buildInvocation('glm', 'p', { apiKey: 'K' });
   assert.ok(!inv.args.includes('--permission-mode'));
 });
 
-test('gemini proof mode => unchanged (read-only, no exec)', () => {
-  const inv1 = buildInvocation('gemini', 'p', { apiKey: 'K', proof: true });
+test('gemini fullRights => unchanged (read-only wrapper, no exec)', () => {
+  const inv1 = buildInvocation('gemini', 'p', { apiKey: 'K', fullRights: true });
   const inv2 = buildInvocation('gemini', 'p', { apiKey: 'K' });
   assert.deepEqual(inv1.args, inv2.args);
 });
