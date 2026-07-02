@@ -3,6 +3,7 @@
   "timeoutMs": null,
   "stallMs": null,
   "proof": { "enabled": true, "experimentTimeoutMs": 30000 },
+  "delegate": { "verifyTimeoutMs": 120000 },
   "engines": [
     { "id": "claude", "model": "opus", "stallMs": 20000 },
     { "id": "codex", "stallMs": 180000 },
