@@ -65,7 +65,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/storm-companion.mjs" delegate <engine> "<tas
 - Long delegations: run in a background shell; a per-engine heartbeat streams
   to stderr (`[storm +45s] codex: 38ev idle 5s`) — check it periodically.
 - You receive JSON: `{ mode:"delegate", engine, resolvedModel, task, repoPath,
-  status, result, patch, verify }`. `patch` is `{ path, files, insertions,
+  status, result|error, patch, verify }`. A non-ok status carries `error` (the
+  reason) and may omit `result`. `patch` is `{ path, files, insertions,
   deletions, stat }` or `null` (a planning/research task delivers via `result`
   alone — that is a valid outcome). `verify` is `{ run, exitCode, stdoutTail,
   stderrTail, timedOut }` or `null`.

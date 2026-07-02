@@ -3,7 +3,7 @@
   "version": "0.12.0",
   "type": "module",
   "private": true,
-  "description": "Storm — multi-engine council for Claude Code (plan mode)",
+  "description": "Storm — multi-engine council + single-engine delegation for Claude Code",
   "scripts": {
     "test": "node --test"
   }

@@ -88,7 +88,7 @@ GLM and Gemini need keys. Put them in `.storm-secrets.json` in the plugin root �
 /storm plan <task>
 ```
 
-Storm is read-only (`plan`): review, RCA, analysis, second opinions. Examples:
+`plan` is read-only: review, RCA, analysis, second opinions. Examples:
 
 ```
 /storm plan review the auth changes in this diff for security holes
@@ -159,7 +159,7 @@ Per-engine reasoning is explicit: `glm` runs at `effort: "max"`; the optional `g
 
 Plain Node ESM, **zero runtime dependencies**, tested with `node --test`.
 
-- `scripts/storm-companion.mjs` — CLI entrypoint (`plan "<task>"` → JSON results)
+- `scripts/storm-companion.mjs` — CLI entrypoint (`plan` / `delegate` → JSON results)
 - `scripts/lib/`
   - `adapters.mjs` — per-engine invocation (cmd, args, env, stream flag)
   - `fan-out.mjs` — parallel runner, `Promise.allSettled` with per-engine isolation
