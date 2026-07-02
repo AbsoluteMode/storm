@@ -18,6 +18,8 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/storm-companion.mjs" plan "<task>" 
   not fatal: synthesize from the engines that answered, but list each dropped engine WITH its
   reason (status + error) and its `resolvedModel`. Report each answering engine's `resolvedModel`
   (source of truth for which model ran — never describe models from memory).
-- Proof mode (`config.proof.enabled`): findings are tagged proven/disproven/unproven-*;
-  output adds `executed_experiments` + `pending_paid_experiments`. Only `proven` are
-  confirmed bugs; paid experiments are surfaced, never auto-run.
+- Proof mode (`config.proof.enabled`): findings are tagged
+  `proven`/`disproven`/`engine-claimed`/`unproven`/`unproven-cannot`; output adds
+  `verified_experiments` (orchestrator re-ran locally in a fresh worktree) +
+  `engine_claimed_experiments` (engine-run networked experiments, not re-run).
+  Only `proven` are confirmed bugs; `engine-claimed` is reported as unverified.
