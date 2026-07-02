@@ -43,3 +43,35 @@ test('--cwd pointing at a file (not a dir): throws', () => {
 test('--cwd with no value: throws', () => {
   assert.throws(() => parseStormArgs(['plan', 'task', '--cwd']), /requires a path/);
 });
+
+// --- delegate mode arguments ---
+
+test('delegate: positionals are [mode, engine, task]', () => {
+  const { mode, engine, task } = parseStormArgs(['delegate', 'codex', 'fix the bug']);
+  assert.equal(mode, 'delegate');
+  assert.equal(engine, 'codex');
+  assert.equal(task, 'fix the bug');
+});
+
+test('plan: engine is null, task in the old position (backward compat)', () => {
+  const { mode, engine, task } = parseStormArgs(['plan', 'review this']);
+  assert.equal(mode, 'plan');
+  assert.equal(engine, null);
+  assert.equal(task, 'review this');
+});
+
+test('--verify is captured position-independently', () => {
+  const a = parseStormArgs(['delegate', 'glm', 't', '--verify', 'npm test']);
+  assert.equal(a.verify, 'npm test');
+  const b = parseStormArgs(['--verify', 'npm test', 'delegate', 'glm', 't']);
+  assert.equal(b.verify, 'npm test');
+  assert.equal(b.engine, 'glm');
+});
+
+test('--verify without a value throws (fail-fast)', () => {
+  assert.throws(() => parseStormArgs(['delegate', 'codex', 't', '--verify']), /--verify requires/);
+});
+
+test('no --verify => verify is null', () => {
+  assert.equal(parseStormArgs(['plan', 't']).verify, null);
+});
