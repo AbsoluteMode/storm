@@ -2,6 +2,7 @@
 import { runEngine } from './run-engine.mjs';
 import { buildStormPrompt } from './prompt.mjs';
 import { makeEngineWorkspace } from './workspace.mjs';
+import { createHeartbeat } from './heartbeat.mjs';
 
 export async function runAll(task, engines, opts = {}) {
   const runner = opts.runner ?? runEngine;
@@ -12,32 +13,14 @@ export async function runAll(task, engines, opts = {}) {
   // isolation. The self-experiment contract already says "." is its working copy.
   const prompt = buildStormPrompt({ task, role, repoPath: proof ? undefined : opts.cwd, proof });
 
-  const progress = {}; // id -> { chunks, lastActivityAt, status }
-  const startedAt = Date.now();
-  const hbMs = opts.heartbeatMs ?? 15000;
-  const writeHeartbeat = opts.onHeartbeat ?? ((line) => process.stderr.write(line + '\n'));
-  let hb;
-  if (Number.isFinite(hbMs) && hbMs > 0) {
-    hb = setInterval(() => {
-      const now = Date.now();
-      const parts = engines.map((e) => {
-        const p = progress[e.id];
-        if (!p) return `${e.id}: …`;
-        if (p.status && p.status !== 'ok') return `${e.id}: ${p.status}`;
-        const idle = Math.round((now - (p.lastActivityAt ?? now)) / 1000);
-        return `${e.id}: ${p.chunks ?? 0}ev idle ${idle}s`;
-      });
-      writeHeartbeat(`[storm +${Math.round((now - startedAt) / 1000)}s] ${parts.join(' | ')}`);
-    }, hbMs);
-    if (hb.unref) hb.unref();
-  }
+  const hb = createHeartbeat(engines.map((e) => e.id), {
+    heartbeatMs: opts.heartbeatMs,
+    onHeartbeat: opts.onHeartbeat,
+  });
 
   const settled = await Promise.allSettled(
     engines.map(async (e) => {
       let ws = null;
-      const onProgress = (s) => {
-        progress[e.id] = { chunks: s.chunks, lastActivityAt: s.lastActivityAt, status: null };
-      };
       try {
         const cwd = proof ? (ws = makeEngineWorkspace(opts.cwd, e.id)).dir : opts.cwd;
         // fullRights: proof engines self-experiment with write/exec/network in
@@ -48,9 +31,9 @@ export async function runAll(task, engines, opts = {}) {
           stallMs: e.stallMs ?? opts.stallMs,
           cwd,
           env: e.experimentEnv,
-          onProgress,
+          onProgress: (s) => hb.onProgress(e.id, s),
         });
-        progress[e.id] = { ...(progress[e.id] ?? {}), status: res.status };
+        hb.setStatus(e.id, res.status);
         return res;
       } finally {
         if (ws) ws.cleanup();
@@ -58,7 +41,7 @@ export async function runAll(task, engines, opts = {}) {
     })
   );
 
-  if (hb) clearInterval(hb);
+  hb.stop();
 
   return settled.map((s, i) =>
     s.status === 'fulfilled'
