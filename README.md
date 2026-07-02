@@ -8,7 +8,7 @@
 
 Storm runs your prompt through three independent engines in parallel — **Claude**, **Codex** (GPT), and **GLM** (z.ai), plus an optional **Gemini** adapter (Google, via OpenRouter) — then synthesizes their outputs into one answer: consensus, disagreements, and unique findings. Different model weights make uncorrelated mistakes, so the synthesis keeps what they agree on and surfaces what only one caught.
 
-It's a Claude Code plugin. One command: `/storm plan <task>`.
+It's a Claude Code plugin. Two commands: `/storm plan <task>` (council review) and `/storm delegate <engine> <task>` (hand a task to one engine as a full-rights executor).
 
 > [!NOTE]
 > Claude and Codex run on your own CLI subscriptions (no API keys). GLM and Gemini use keys you provide, kept in a local gitignored file. A missing key just drops that engine — the council runs with whoever's available.
@@ -124,6 +124,22 @@ The orchestrator then **re-runs** each locally-reproducible experiment in a fres
 
 Set `proof.enabled: false` in `scripts/config.json` to fall back to plain read-only review. WHY: [`docs/decisions/2026-06-27-stage2-self-experiment.md`](docs/decisions/2026-06-27-stage2-self-experiment.md).
 
+## Delegate mode
+
+`/storm delegate <engine> "<task>"` — Claude Code is the customer, one engine is
+the executor. The engine gets an isolated git worktree (your uncommitted work
+transferred in), full rights inside it, and does the task end-to-end: writes
+code, runs tests, experiments. Nothing is discarded: the work comes back as
+
+- a report (`result` — what it did, what it verified, limitations),
+- a diffstat + a **patch file** (never a raw diff in your context),
+- optionally a `--verify "<cmd>"` acceptance run executed in the worktree.
+
+Claude Code reviews the diffstat, inspects the patch selectively, and applies it
+with `git apply --3way` — or rejects it. Your repo is never written by Storm
+itself; an empty patch with a good report is a valid outcome for planning tasks. Patch files live in your OS tmp dir and are cleaned up by the OS, not by Storm — they must outlive the companion run so you can apply them.
+Use it when another engine is simply stronger on the task at hand.
+
 ## Configuration
 
 `scripts/config.json`:
@@ -168,7 +184,7 @@ node --test
 
 ## Limitations
 
-- Read-only (`plan`) for now; `action` mode is a future phase.
+- `plan` (read-only council) and `delegate` (single-engine execution via patch) exist; parallel multi-engine `action` with smart merge is a future phase.
 - A stall/timeout kill reaches the direct child only; grandchildren spawned by an engine CLI may be left orphaned.
 - Engines must wrap their final answer in `<STORM_RESULT>…</STORM_RESULT>`; a partial or marker-less output is salvaged best-effort.
 

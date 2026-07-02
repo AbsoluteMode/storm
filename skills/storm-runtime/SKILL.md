@@ -6,6 +6,7 @@ user-invocable: false
 # Storm Runtime
 
 Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/storm-companion.mjs" plan "<task>" [--cwd <abs-path>]`
+Delegate: `node "${CLAUDE_PLUGIN_ROOT}/scripts/storm-companion.mjs" delegate <engine> "<task>" [--cwd <abs-path>] [--verify "<cmd>"]`
 
 - Returns normalized JSON `{ mode, task, repoPath, results: [{engine,resolvedModel,status,result|error}] }`.
 - `--cwd <abs-path>`: directory the engines read (default: the companion's cwd). For a
@@ -23,3 +24,9 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/storm-companion.mjs" plan "<task>" 
   `verified_experiments` (orchestrator re-ran locally in a fresh worktree) +
   `engine_claimed_experiments` (engine-run networked experiments, not re-run).
   Only `proven` are confirmed bugs; `engine-claimed` is reported as unverified.
+- Delegate mode: one engine as full-rights executor in an isolated worktree;
+  returns `{ …, status, result, patch: {path,files,insertions,deletions,stat}|null,
+  verify: {run,exitCode,stdoutTail,stderrTail,timedOut}|null }`. The patch file is
+  the deliverable — inspect selectively, apply with `git apply --3way`, never dump
+  it whole. `verify.exitCode != 0` / `timedOut` / `status != ok` => don't apply by
+  default. Empty patch + report is a valid outcome for planning tasks.

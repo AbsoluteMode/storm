@@ -1,10 +1,11 @@
 ---
-description: Storm — convene a multi-engine council (Claude+Codex+GLM) on demand
+description: Storm — multi-engine council (plan) and single-engine delegation (delegate)
 ---
 # /storm
 
 Usage: `/storm plan <task>` — the council reads the session's working directory by
 default; for a task about a *different* local repo, target it explicitly.
+`/storm delegate <engine> <task>` — delegate the task to one engine as a full-rights executor in an isolated worktree.
 
 You are the Storm orchestrator. On this command:
 
@@ -52,4 +53,32 @@ NOT re-run by the orchestrator). Synthesis rules:
 - `unproven` / `unproven-cannot` -> a separate "not proven" section (include the
   engine's stated why when present).
 
-Only `plan` mode (read-only) exists in v1. `action` mode is a future phase.
+## /storm delegate <engine> "<task>"
+
+One engine (codex | glm | claude) works as the EXECUTOR in an isolated git
+worktree with full rights inside it; you are the customer accepting the work.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/storm-companion.mjs" delegate <engine> "<task>" [--cwd <abs-repo-path>] [--verify "<cmd>"]
+```
+
+- Long delegations: run in a background shell; a per-engine heartbeat streams
+  to stderr (`[storm +45s] codex: 38ev idle 5s`) — check it periodically.
+- You receive JSON: `{ mode:"delegate", engine, resolvedModel, task, repoPath,
+  status, result, patch, verify }`. `patch` is `{ path, files, insertions,
+  deletions, stat }` or `null` (a planning/research task delivers via `result`
+  alone — that is a valid outcome). `verify` is `{ run, exitCode, stdoutTail,
+  stderrTail, timedOut }` or `null`.
+- Acceptance flow (you are the customer):
+  1. Read `result` (the executor's report) and `patch.stat`.
+  2. Inspect the patch file selectively (Read with offset/limit) — NEVER dump
+     it whole into the conversation.
+  3. If `verify` ran: `exitCode != 0` or `timedOut` => do NOT apply; report to
+     the user, return the task to the executor or fix it yourself.
+  4. Apply: `git apply --3way "<patch.path>"`, run your own checks; to roll
+     back: `git apply -R "<patch.path>"`.
+  5. `status != ok` => the patch (if any) is partial work of a killed engine;
+     default to NOT applying — surface it to the user instead.
+- Surface `repoPath` and `resolvedModel`, as in plan mode.
+
+`plan` (council review) and `delegate` (single-engine execution) exist. Parallel multi-engine implementation (`action` with smart merge) is a future phase.
