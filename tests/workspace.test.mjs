@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync, rmSync, symlinkSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { makeEngineWorkspace } from '../scripts/lib/workspace.mjs';
+import { makeEngineWorkspace, isGitRepo, snapshotWorkspace } from '../scripts/lib/workspace.mjs';
 
 function initRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'storm-wt-test-'));
@@ -87,5 +87,46 @@ test('untracked symlink pointing outside the repo is recreated as a symlink, not
     ws.cleanup();
     rmSync(dir, { recursive: true, force: true });
     rmSync(outerDir, { recursive: true, force: true });
+  }
+});
+
+function initRepoWS() {
+  const dir = mkdtempSync(join(tmpdir(), 'storm-ws-snap-'));
+  const git = (...a) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8' });
+  git('init', '-q');
+  git('config', 'user.email', 't@t');
+  git('config', 'user.name', 't');
+  writeFileSync(join(dir, 'a.txt'), 'committed\n');
+  git('add', '-A');
+  git('commit', '-qm', 'init');
+  return dir;
+}
+
+test('isGitRepo: true for a git repo, false for a plain dir', () => {
+  const repo = initRepoWS();
+  const plain = mkdtempSync(join(tmpdir(), 'storm-ws-plain-'));
+  try {
+    assert.equal(isGitRepo(repo), true);
+    assert.equal(isGitRepo(plain), false);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+    rmSync(plain, { recursive: true, force: true });
+  }
+});
+
+test('snapshotWorkspace: commits transferred state, returns a sha; works with clean tree too', () => {
+  const repo = initRepoWS();
+  try {
+    // dirty file (simulates transferred uncommitted work)
+    writeFileSync(join(repo, 'dirty.txt'), 'uncommitted\n');
+    const sha = snapshotWorkspace(repo);
+    assert.match(sha, /^[0-9a-f]{40}$/);
+    const status = execFileSync('git', ['-C', repo, 'status', '--porcelain'], { encoding: 'utf8' });
+    assert.equal(status.trim(), '', 'snapshot must leave a clean tree');
+    // clean tree: --allow-empty makes a second snapshot still return a sha
+    const sha2 = snapshotWorkspace(repo);
+    assert.match(sha2, /^[0-9a-f]{40}$/);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
   }
 });

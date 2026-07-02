@@ -12,14 +12,34 @@ function git(repo, args, run) {
   return run('git', ['-C', repo, ...args], { encoding: 'utf8' });
 }
 
+// True when repoPath is inside a git work tree. Exported for delegate mode's
+// fail-fast (delegate is git-only: a cp-copy has nothing to diff against).
+export function isGitRepo(repoPath, deps = {}) {
+  const run = deps.run ?? ((cmd, args, opts) => ({ stdout: execFileSync(cmd, args, opts) }));
+  try {
+    return String(git(repoPath, ['rev-parse', '--is-inside-work-tree'], run).stdout).trim() === 'true';
+  } catch {
+    return false;
+  }
+}
+
+// Commit the workspace's current state (transferred uncommitted + untracked)
+// as the diff base for delegate mode. Local identity: independent of the
+// user's global git config. --allow-empty: a clean tree still yields a base.
+export function snapshotWorkspace(dir, deps = {}) {
+  const run = deps.run ?? ((cmd, args, opts) => ({ stdout: execFileSync(cmd, args, opts) }));
+  run('git', ['-C', dir, 'add', '-A'], { encoding: 'utf8' });
+  run('git', ['-C', dir, '-c', 'user.email=storm@local', '-c', 'user.name=storm',
+    'commit', '-q', '--allow-empty', '-m', 'storm-delegate base snapshot'], { encoding: 'utf8' });
+  return String(run('git', ['-C', dir, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout).trim();
+}
+
 export function makeEngineWorkspace(repoPath, label, deps = {}) {
   const run = deps.run ?? ((cmd, args, opts) => ({ stdout: execFileSync(cmd, args, opts) }));
   const tmpRoot = deps.tmpRoot ?? tmpdir();
 
   // Detect git repo; on any failure, fall back to a plain copy.
-  let isGit = false;
-  try { isGit = String(git(repoPath, ['rev-parse', '--is-inside-work-tree'], run).stdout).trim() === 'true'; }
-  catch { isGit = false; }
+  const isGit = isGitRepo(repoPath, { run });
 
   if (!isGit) {
     const { dir, cleanup } = makeThrowawayCopy(repoPath);
