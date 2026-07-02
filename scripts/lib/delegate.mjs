@@ -33,12 +33,23 @@ export function extractPatch(wsDir, baseRef, engineId) {
   const dir = mkdtempSync(join(tmpdir(), 'storm-delegate-'));
   const path = join(dir, `delegate-${engineId}.patch`);
   writeFileSync(path, patch);
-  const m = stat.match(/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/);
+  // Counts from --numstat (machine-readable: `<ins>\t<del>\t<path>`, `-` for
+  // binary), not the localized --stat summary line ("N files changed…"),
+  // which breaks under non-English git locales.
+  const numstat = git(wsDir, ['diff', baseRef, '--numstat']);
+  let files = 0, insertions = 0, deletions = 0;
+  for (const line of numstat.split('\n')) {
+    if (!line.trim()) continue;
+    files += 1;
+    const [ins, del] = line.split('\t');
+    if (ins !== '-') insertions += Number(ins);
+    if (del !== '-') deletions += Number(del);
+  }
   return {
     path,
-    files: m ? Number(m[1]) : null,
-    insertions: m?.[2] ? Number(m[2]) : 0,
-    deletions: m?.[3] ? Number(m[3]) : 0,
+    files,
+    insertions,
+    deletions,
     stat: stat.trim().slice(-STAT_CAP),
   };
 }

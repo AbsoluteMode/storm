@@ -53,6 +53,20 @@ test('happy path: patch contains the engine work; the real repo is untouched', a
   }
 });
 
+test('patch counts come from git --numstat (locale-proof, not the localized --stat summary line)', async () => {
+  const repo = initRepo();
+  try {
+    const out = await runDelegate('do it', { id: 'codex' }, {
+      cwd: repo, runner: writingRunner({ content: 'line1\nline2\nline3\n' }),
+    });
+    assert.equal(out.patch.files, 1);
+    assert.equal(out.patch.insertions, 3);
+    assert.equal(out.patch.deletions, 0);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
 test('snapshot base: transferred uncommitted work does NOT leak into the patch', async () => {
   const repo = initRepo();
   try {
