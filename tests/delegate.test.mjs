@@ -160,3 +160,56 @@ test('non-git cwd rejects with a clear error (fail-fast, no engine spawn)', asyn
     rmSync(plain, { recursive: true, force: true });
   }
 });
+
+// --- --verify: acceptance check inside the worktree, before the patch is handed over ---
+
+test('verify pass: exitCode 0 lands in the output', async () => {
+  const repo = initRepo();
+  try {
+    const out = await runDelegate('t', { id: 'codex' }, { cwd: repo, runner: writingRunner(), verify: 'exit 0' });
+    assert.ok(out.verify, 'verify block expected');
+    assert.equal(out.verify.run, 'exit 0');
+    assert.equal(out.verify.exitCode, 0);
+    assert.equal(out.verify.timedOut, false);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('verify fail: non-zero exitCode is reported, patch still extracted', async () => {
+  const repo = initRepo();
+  try {
+    const out = await runDelegate('t', { id: 'codex' }, { cwd: repo, runner: writingRunner(), verify: 'echo broken >&2; exit 3' });
+    assert.equal(out.verify.exitCode, 3);
+    assert.match(out.verify.stderrTail, /broken/);
+    assert.ok(out.patch, 'patch is still handed over; applying is the caller\'s decision');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('verify timeout: timedOut true, exitCode null', async () => {
+  const repo = initRepo();
+  try {
+    const out = await runDelegate('t', { id: 'codex' }, {
+      cwd: repo, runner: writingRunner(), verify: 'sleep 5', verifyTimeoutMs: 200,
+    });
+    assert.equal(out.verify.timedOut, true);
+    assert.equal(out.verify.exitCode, null);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('verify runs INSIDE the worktree and AFTER patch extraction (its artifacts stay out of the patch)', async () => {
+  const repo = initRepo();
+  try {
+    const out = await runDelegate('t', { id: 'codex' }, {
+      cwd: repo, runner: writingRunner(), verify: 'echo artifact > verify-artifact.txt; test -f made-by-engine.txt',
+    });
+    assert.equal(out.verify.exitCode, 0, 'verify must see the engine work in its cwd (worktree)');
+    assert.doesNotMatch(readFileSync(out.patch.path, 'utf8'), /verify-artifact/, 'verify artifacts must not be in the patch');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});

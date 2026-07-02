@@ -11,6 +11,8 @@ import { runEngine } from './run-engine.mjs';
 import { buildDelegatePrompt } from './prompt.mjs';
 import { makeEngineWorkspace, isGitRepo, snapshotWorkspace } from './workspace.mjs';
 import { createHeartbeat } from './heartbeat.mjs';
+import { runExperiment } from './proof.mjs';
+import { experimentEnv } from './sandbox.mjs';
 
 const STAT_CAP = 2000; // context-protection: diffstat tail cap in the JSON output
 
@@ -64,6 +66,17 @@ export async function runDelegate(task, engine, opts = {}) {
     // Snap the patch for ANY status: partial work of a stalled/killed engine
     // may be valuable; the caller decides by status (default: don't apply).
     const patch = extractPatch(ws.dir, baseRef, engine.id);
+    // Acceptance check AFTER patch extraction (its artifacts stay out of the
+    // patch) and INSIDE the worktree (dirt never reaches the real repo).
+    // experimentEnv: minimal env, no provider keys — same policy as proof re-runs.
+    let verify = null;
+    if (opts.verify) {
+      const v = await runExperiment(opts.verify, ws.dir, {
+        timeoutMs: opts.verifyTimeoutMs ?? 120000,
+        env: experimentEnv(),
+      });
+      verify = { run: opts.verify, exitCode: v.exitCode, stdoutTail: v.stdoutTail, stderrTail: v.stderrTail, timedOut: v.timedOut };
+    }
     return {
       mode: 'delegate',
       engine: engine.id,
@@ -74,7 +87,7 @@ export async function runDelegate(task, engine, opts = {}) {
       ...(res.result !== undefined ? { result: res.result } : {}),
       ...(res.error !== undefined ? { error: res.error } : {}),
       patch,
-      verify: null, // filled by --verify (Task 6)
+      verify,
     };
   } finally {
     hb.stop();
