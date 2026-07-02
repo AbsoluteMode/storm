@@ -1,6 +1,6 @@
 {
   "name": "storm",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Convene a council of engines (Claude + Codex + GLM, optional Gemini) on demand and synthesize one answer.",
   "author": { "name": "max" }
 }
