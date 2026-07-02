@@ -7,7 +7,10 @@ export async function runAll(task, engines, opts = {}) {
   const runner = opts.runner ?? runEngine;
   const role = opts.role ?? 'reviewer';
   const proof = !!opts.proof;
-  const prompt = buildStormPrompt({ task, role, repoPath: opts.cwd, proof });
+  // Proof engines run with full rights inside per-engine worktrees; the prompt
+  // must not name the real repo path, or an engine may follow it out of its
+  // isolation. The self-experiment contract already says "." is its working copy.
+  const prompt = buildStormPrompt({ task, role, repoPath: proof ? undefined : opts.cwd, proof });
 
   const progress = {}; // id -> { chunks, lastActivityAt, status }
   const startedAt = Date.now();

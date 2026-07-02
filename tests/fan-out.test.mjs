@@ -202,3 +202,35 @@ test('heartbeatMs <= 0 disables the heartbeat', async () => {
   await runAll('task', [{ id: 'claude' }], { runner, heartbeatMs: 0, onHeartbeat: (l) => lines.push(l) });
   assert.equal(lines.length, 0);
 });
+
+test('proof mode: the prompt must not leak the real repo path (engines run in isolated worktrees)', async () => {
+  // An engine in proof mode has full rights inside its worktree. If the prompt
+  // names the real repo path ("Repository: /abs/path"), the engine may follow it
+  // OUT of its isolation and read/experiment on the real repo. The self-experiment
+  // contract already tells it "." is its working copy — the prompt must say no more.
+  const repoPath = initRepo();
+  try {
+    const prompts = [];
+    const runner = (id, prompt) => {
+      prompts.push(prompt);
+      return Promise.resolve({ engine: id, status: 'ok', result: 'r' });
+    };
+    await runAll('task', [{ id: 'claude' }, { id: 'codex' }], { runner, cwd: repoPath, proof: true });
+    assert.equal(prompts.length, 2);
+    for (const p of prompts) {
+      assert.ok(!p.includes(repoPath), `proof prompt must not contain the real repo path, got:\n${p}`);
+    }
+  } finally {
+    rmSync(repoPath, { recursive: true, force: true });
+  }
+});
+
+test('non-proof: the prompt still names the target repo path (engines read it in place)', async () => {
+  const prompts = [];
+  const runner = (id, prompt) => {
+    prompts.push(prompt);
+    return Promise.resolve({ engine: id, status: 'ok', result: 'r' });
+  };
+  await runAll('task', [{ id: 'claude' }], { runner, cwd: '/target/repo', proof: false });
+  assert.ok(prompts[0].includes('/target/repo'), 'non-proof prompt should carry the repo path');
+});
