@@ -6,7 +6,7 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D20-green?style=flat-square)
 ![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen?style=flat-square)
 
-Storm runs your prompt through four independent engines in parallel — **Claude**, **Codex** (GPT), **GLM** (z.ai), and **Gemini** (Google, via OpenRouter) — then synthesizes their outputs into one answer: consensus, disagreements, and unique findings. Different model weights make uncorrelated mistakes, so the synthesis keeps what they agree on and surfaces what only one caught.
+Storm runs your prompt through three independent engines in parallel — **Claude**, **Codex** (GPT), and **GLM** (z.ai), plus an optional **Gemini** adapter (Google, via OpenRouter) — then synthesizes their outputs into one answer: consensus, disagreements, and unique findings. Different model weights make uncorrelated mistakes, so the synthesis keeps what they agree on and surfaces what only one caught.
 
 It's a Claude Code plugin. One command: `/storm plan <task>`.
 
@@ -24,8 +24,7 @@ Frontier models in a blind comparison beat any single one of them. Storm is a sm
         │
         ├─▶ claude  ─┐
         ├─▶ codex   ─┤  parallel, each wraps its answer in <STORM_RESULT>…</STORM_RESULT>
-        ├─▶ glm     ─┤
-        └─▶ gemini  ─┘
+        └─▶ glm     ─┘  (+ gemini, if enabled in config)
                      │
                      ▼
         orchestrator extracts each block → synthesizes one answer
@@ -35,7 +34,17 @@ Frontier models in a blind comparison beat any single one of them. Storm is a sm
 - **On your own accounts.** Each engine is a headless subprocess. Claude and Codex use their logged-in CLI sessions; GLM and Gemini use your keys. GLM runs through the Claude harness pointed at z.ai (isolated config dir, so your own Claude Code stays on Anthropic); Gemini runs through an **agentic** OpenRouter wrapper that can read repo files via sandboxed `read_file`/`list_dir`/`grep` tools (confined to the working directory; secrets and `.git` blocked).
 - **Context-protected.** The orchestrator never sees raw engine chatter — only the `<STORM_RESULT>` block each engine emits. A misbehaving engine can't bloat your context.
 - **Resilient.** A failed, stalled, or auth-blocked engine degrades gracefully; the council synthesizes from whoever answered.
-- **No wall-clock kills.** Engines do deep work and may run for minutes; silence isn't death. Liveness = the process staying alive (the OS reports exit). Timeouts are opt-in (off by default); the one time-based guard is an auth-prompt grace timer. WHY: [`docs/decisions/2026-06-25-no-timeouts-liveness.md`](docs/decisions/2026-06-25-no-timeouts-liveness.md).
+- **Liveness = progress, not clocks.** Engines do deep work and may run for minutes; a working engine (still emitting events) is never killed, however long it takes. What IS killed: an engine silent past its calibrated per-engine `stallMs` (below). The wall-clock `timeoutMs` stays opt-in (off by default); the other time-based guard is an auth-prompt grace timer. WHY: [`docs/decisions/2026-06-25-no-timeouts-liveness.md`](docs/decisions/2026-06-25-no-timeouts-liveness.md), revisited by [`docs/decisions/2026-06-30-per-engine-stall-revisit.md`](docs/decisions/2026-06-30-per-engine-stall-revisit.md).
+
+### Liveness & progress
+
+Each engine has a per-engine `stallMs` in `config.json` (claude 20s / glm 60s /
+codex 180s), calibrated from measured worst-case normal silence. An engine that
+goes silent past its threshold while still alive is killed (`stalled`) and the
+council synthesizes from whoever answered; a working engine (still streaming
+events) is never killed. While the council runs, a heartbeat prints to stderr
+every ~15s: `[storm +45s] claude: 130ev idle 2s | codex: 38ev idle 5s | glm: …`.
+Each result also carries `resolvedModel` — the actual model the engine ran.
 
 ## Requirements
 
@@ -43,7 +52,7 @@ Frontier models in a blind comparison beat any single one of them. Storm is a sm
 - [`claude`](https://docs.claude.com/en/docs/claude-code) CLI — installed and authenticated
 - [`codex`](https://github.com/openai/codex) CLI — installed and authenticated
 - *(optional)* a [z.ai GLM Coding Plan](https://z.ai/subscribe) key — for the GLM engine
-- *(optional)* an [OpenRouter](https://openrouter.ai/keys) key — for the Gemini engine
+- *(optional)* an [OpenRouter](https://openrouter.ai/keys) key — for the Gemini engine (not in the default council; add it to `config.engines` to use)
 
 ## Install
 
@@ -121,12 +130,14 @@ Set `proof.enabled: false` in `scripts/config.json` to fall back to plain read-o
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `engines` | `claude`, `codex`, `glm`, `gemini` | The council. An optional `antigravity` adapter (Gemini via the `agy` CLI) is also included. |
+| `engines` | `claude`, `codex`, `glm` | The council, each with per-engine `model` / `effort` / `stallMs`. Optional adapters: `gemini` (OpenRouter), `antigravity` (Gemini via the `agy` CLI). |
 | `role` | `reviewer` | Framing handed to each engine. |
-| `stallMs` | `60000` | Inactivity watchdog. Stream engines emit a real heartbeat, so silence past this means a genuine hang. |
-| `timeoutMs` | `480000` | Absolute backstop, never the primary trigger. |
+| `engines[].stallMs` | claude `20000`, glm `60000`, codex `180000` | Per-engine no-progress watchdog, calibrated from measured worst-case normal silence. Silent past the threshold while alive → killed as `stalled`. |
+| `stallMs` | `null` | Global fallback when an engine has no own `stallMs`; `null` disables. |
+| `timeoutMs` | `null` | Opt-in wall-clock backstop; `null` (default) disables it. |
+| `proof` | `{ "enabled": true, "experimentTimeoutMs": 30000 }` | Proof mode toggle + time cap for each orchestrator re-run. |
 
-Per-engine reasoning is explicit: `glm` runs at `effort: "max"`, `gemini` at `reasoning: "high"`. Tune them per engine in the config.
+Per-engine reasoning is explicit: `glm` runs at `effort: "max"`; the optional `gemini` adapter takes `reasoning: "high"`. Tune them per engine in the config.
 
 ## Architecture
 
@@ -158,7 +169,7 @@ node --test
 ## Limitations
 
 - Read-only (`plan`) for now; `action` mode is a future phase.
-- The timeout kills the direct child only; grandchildren spawned by an engine CLI may be left orphaned.
+- A stall/timeout kill reaches the direct child only; grandchildren spawned by an engine CLI may be left orphaned.
 - Engines must wrap their final answer in `<STORM_RESULT>…</STORM_RESULT>`; a partial or marker-less output is salvaged best-effort.
 
 ## License
