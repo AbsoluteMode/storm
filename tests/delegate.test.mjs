@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runDelegate } from '../scripts/lib/delegate.mjs';
@@ -141,6 +141,28 @@ test('per-engine stallMs reaches the runner opts; engine worktree is cleaned up'
     assert.equal(seenOpts.stallMs, 180000);
     assert.notEqual(wsDir, repo, 'engine must run in a worktree, not the repo');
     assert.equal(existsSync(wsDir), false, 'worktree must be cleaned up');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('delegate worktree does not symlink the real repo node_modules (full-rights executor + npm install would write through it)', async () => {
+  const repo = initRepo();
+  try {
+    // gitignore node_modules like a real repo would, so the untracked-file
+    // transfer loop doesn't create it as a real dir for the wrong reason.
+    writeFileSync(join(repo, '.gitignore'), 'node_modules\n');
+    execFileSync('git', ['-C', repo, 'add', '-A']);
+    execFileSync('git', ['-C', repo, 'commit', '-qm', 'gitignore node_modules']);
+    mkdirSync(join(repo, 'node_modules'));
+    writeFileSync(join(repo, 'node_modules', 'marker.txt'), 'real nm\n');
+    let sawNodeModules = null;
+    const runner = (id, _p, _c, opts) => {
+      sawNodeModules = existsSync(join(opts.cwd, 'node_modules'));
+      return Promise.resolve({ engine: id, status: 'ok', result: 'r' });
+    };
+    await runDelegate('t', { id: 'codex' }, { cwd: repo, runner });
+    assert.equal(sawNodeModules, false, 'delegate worktree must not have node_modules symlinked in');
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }

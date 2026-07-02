@@ -78,8 +78,12 @@ export function makeEngineWorkspace(repoPath, label, deps = {}) {
   }
 
   // Symlink node_modules so dependency-needing experiments work without reinstall.
-  const nm = join(repoPath, 'node_modules');
-  if (existsSync(nm)) { try { symlinkSync(nm, join(dir, 'node_modules')); } catch { /* exists/unsupported */ } }
+  // Opt-out for delegate: a full-rights executor's `npm install` would write
+  // through the symlink into the real repo's node_modules.
+  if (deps.linkNodeModules ?? true) {
+    const nm = join(repoPath, 'node_modules');
+    if (existsSync(nm)) { try { symlinkSync(nm, join(dir, 'node_modules')); } catch { /* exists/unsupported */ } }
+  }
 
   const cleanup = once(() => {
     try { git(repoPath, ['worktree', 'remove', '--force', dir], run); } catch { /* already gone */ }

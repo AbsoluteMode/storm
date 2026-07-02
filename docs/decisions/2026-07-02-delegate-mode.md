@@ -29,6 +29,7 @@ uncommitted — база диффа: патч содержит строго ра
   (action со smart merge) — отдельная фаза, fan-out к ней готов.
 - Реюз: workspace/run-engine/adapters/secrets/runExperiment/heartbeat — новых
   подсистем нет, только delegate.mjs-оркестрация.
+- Worktree делегата НЕ симлинкает node_modules реального репо (исполнитель с полными правами писал бы сквозь симлинк, npm install); proof-режим симлинк сохраняет.
 
 ## Что протестировали
 

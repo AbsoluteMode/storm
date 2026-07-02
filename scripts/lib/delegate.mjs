@@ -50,7 +50,8 @@ export async function runDelegate(task, engine, opts = {}) {
   if (!isGitRepo(opts.cwd)) {
     throw new Error(`delegate requires a git repository at --cwd, got: ${opts.cwd}`);
   }
-  const ws = makeEngineWorkspace(opts.cwd, `delegate-${engine.id}`);
+  // Full-rights executor + npm install would write through the symlink into the real repo.
+  const ws = makeEngineWorkspace(opts.cwd, `delegate-${engine.id}`, { linkNodeModules: false });
   const hb = createHeartbeat([engine.id], { heartbeatMs: opts.heartbeatMs, onHeartbeat: opts.onHeartbeat });
   try {
     const baseRef = snapshotWorkspace(ws.dir);

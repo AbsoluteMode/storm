@@ -102,6 +102,23 @@ function initRepoWS() {
   return dir;
 }
 
+test('proof-mode default: node_modules is symlinked (behavior unchanged)', () => {
+  const { dir, git } = initRepo();
+  // Real repos gitignore node_modules; without that, the untracked-file
+  // transfer loop would create it as a real dir before the symlink step runs.
+  writeFileSync(join(dir, '.gitignore'), 'node_modules\n');
+  git('add', '-A'); git('commit', '-qm', 'gitignore node_modules');
+  mkdirSync(join(dir, 'node_modules'));
+  writeFileSync(join(dir, 'node_modules', 'marker.txt'), 'nm\n');
+  const ws = makeEngineWorkspace(dir, 'codex');
+  try {
+    assert.ok(lstatSync(join(ws.dir, 'node_modules')).isSymbolicLink(), 'default path must still symlink node_modules');
+  } finally {
+    ws.cleanup();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('isGitRepo: true for a git repo, false for a plain dir', () => {
   const repo = initRepoWS();
   const plain = mkdtempSync(join(tmpdir(), 'storm-ws-plain-'));
