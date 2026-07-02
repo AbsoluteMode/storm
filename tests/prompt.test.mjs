@@ -46,3 +46,24 @@ test('buildStormPrompt: default (no proof) stays marker-only, no proof grammar',
   assert.doesNotMatch(p, /PROOF MODE/);
   assert.ok(p.includes('<STORM_RESULT>'));
 });
+
+// --- delegate: executor contract ---
+import { buildDelegatePrompt } from '../scripts/lib/prompt.mjs';
+
+test('delegate prompt: task, executor contract, markers — and NO repo path, NO role line', () => {
+  const p = buildDelegatePrompt({ task: 'fix the flaky retry logic' });
+  assert.match(p, /fix the flaky retry logic/);
+  assert.match(p, /EXECUTOR/);
+  assert.match(p, /isolated copy/i);
+  assert.match(p, /<STORM_RESULT>/);
+  assert.match(p, /<\/STORM_RESULT>/);
+  assert.doesNotMatch(p, /Repository:/);
+  assert.doesNotMatch(p, /senior code reviewer/i);
+});
+
+test('delegate prompt: asks for a report (did/verified/limitations), not findings grammar', () => {
+  const p = buildDelegatePrompt({ task: 'x' });
+  assert.match(p, /what you did/i);
+  assert.match(p, /what you verified/i);
+  assert.doesNotMatch(p, /\[FINDING\]/);
+});

@@ -45,3 +45,25 @@ export function buildStormPrompt({ task, role = 'reviewer', repoPath, proof = fa
     ...(proof ? SELF_EXPERIMENT_CONTRACT : DEFAULT_CONTRACT),
   ].filter(Boolean).join('\n');
 }
+
+// Delegate mode: the engine is a full-rights EXECUTOR in an isolated worktree.
+// No role framing, no repo path (isolation invariant, see fix a0dd235) — the
+// contract's "." is all it needs. File changes are collected as a patch by the
+// orchestrator, so committing is not required.
+const DELEGATE_CONTRACT = [
+  'You are the EXECUTOR of a delegated task.',
+  'Your working directory (`.`) is an isolated copy of the repository. Work only here.',
+  'Do the task end-to-end: write code, run commands and tests, experiment freely.',
+  'You have full rights in this copy. Committing is not required — file changes',
+  'are collected automatically when you finish.',
+  'When done, output ONLY a report wrapped in the markers, nothing after the close:',
+  '<STORM_RESULT>',
+  '- what you did (files touched, approach)',
+  '- what you verified (commands run, results)',
+  '- known limitations / follow-ups',
+  '</STORM_RESULT>',
+];
+
+export function buildDelegatePrompt({ task } = {}) {
+  return [`Task: ${task}`, '', ...DELEGATE_CONTRACT].join('\n');
+}
